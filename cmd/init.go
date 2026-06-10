@@ -5,6 +5,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"path/filepath"
 
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
@@ -19,6 +20,7 @@ var initCmd = &cobra.Command{
 		var database string
 		var cache string
 		var monitoring bool
+		var cicd bool
 
 		form := huh.NewForm(
 			huh.NewGroup(
@@ -51,6 +53,10 @@ var initCmd = &cobra.Command{
 				huh.NewConfirm().
 					Title("Include Monitoring? (Prometheus + Grafana)").
 					Value(&monitoring),
+
+				huh.NewConfirm().
+					Title("Include CI/CD Pipeline? (GitHub Actions)").
+					Value(&cicd),
 			),
 		)
 
@@ -59,9 +65,9 @@ var initCmd = &cobra.Command{
 			log.Fatal(err)
 		}
 
-		fmt.Printf("\n✨ Great! We are generating the docker-compose.yml for: Backend=%s, Database=%s, Cache=%s, Monitoring=%v\n", backend, database, cache, monitoring)
+		fmt.Printf("\n✨ Great! Generating environment for: Backend=%s, Database=%s, Cache=%s, Monitoring=%v, CI/CD=%v\n", backend, database, cache, monitoring, cicd)
 		
-		generateDockerCompose(backend, database, cache, monitoring)
+		generateDockerCompose(backend, database, cache, monitoring, cicd)
 	},
 }
 
@@ -82,7 +88,7 @@ func getAvailablePort(port int) int {
 	}
 }
 
-func generateDockerCompose(backend, database, cache string, monitoring bool) {
+func generateDockerCompose(backend, database, cache string, monitoring bool, cicd bool) {
 	content := "version: '3.8'\nservices:\n"
 	
 	if database == "mysql" {
@@ -192,8 +198,46 @@ scrape_configs:
 
 	err := os.WriteFile("docker-compose.yml", []byte(content), 0644)
 	if err != nil {
-		fmt.Println("Error writing docker-compose.yml:", err)
+		fmt.Println("❌ Error writing docker-compose.yml:", err)
 		return
 	}
-	fmt.Println("✅ Successfully generated docker-compose.yml with conflict-free ports!")
+
+	if cicd {
+		err := os.MkdirAll(filepath.Join(".github", "workflows"), 0755)
+		if err == nil {
+			workflowContent := `name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+      
+    - name: Build and run services
+      run: docker-compose up -d
+      
+    - name: Test services
+      run: |
+        sleep 10
+        docker ps
+        # Add actual testing commands here
+        
+    - name: Tear down
+      run: docker-compose down
+`
+			os.WriteFile(filepath.Join(".github", "workflows", "deploy.yml"), []byte(workflowContent), 0644)
+			fmt.Println("✅ Successfully generated .github/workflows/deploy.yml CI/CD pipeline!")
+		}
+	}
+
+	fmt.Println("✅ Successfully generated local environment configuration!")
 }
