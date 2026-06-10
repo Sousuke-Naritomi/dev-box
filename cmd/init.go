@@ -18,6 +18,7 @@ var initCmd = &cobra.Command{
 		var backend string
 		var database string
 		var cache string
+		var monitoring bool
 
 		form := huh.NewForm(
 			huh.NewGroup(
@@ -46,6 +47,10 @@ var initCmd = &cobra.Command{
 						huh.NewOption("None", "none"),
 					).
 					Value(&cache),
+				
+				huh.NewConfirm().
+					Title("Include Monitoring? (Prometheus + Grafana)").
+					Value(&monitoring),
 			),
 		)
 
@@ -54,9 +59,9 @@ var initCmd = &cobra.Command{
 			log.Fatal(err)
 		}
 
-		fmt.Printf("\n✨ Great! We are generating the docker-compose.yml for: Backend=%s, Database=%s, Cache=%s\n", backend, database, cache)
+		fmt.Printf("\n✨ Great! We are generating the docker-compose.yml for: Backend=%s, Database=%s, Cache=%s, Monitoring=%v\n", backend, database, cache, monitoring)
 		
-		generateDockerCompose(backend, database, cache)
+		generateDockerCompose(backend, database, cache, monitoring)
 	},
 }
 
@@ -77,7 +82,7 @@ func getAvailablePort(port int) int {
 	}
 }
 
-func generateDockerCompose(backend, database, cache string) {
+func generateDockerCompose(backend, database, cache string, monitoring bool) {
 	content := "version: '3.8'\nservices:\n"
 	
 	if database == "mysql" {
@@ -153,6 +158,35 @@ app = FastAPI()
 @app.get("/")
 def read_root():
     return {"message": "Hello from dev-box Python Environment!"}
+`), 0644)
+	}
+
+	if monitoring {
+		promPort := getAvailablePort(9090)
+		grafPort := getAvailablePort(3001)
+		content += fmt.Sprintf(`  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "%d:9090"
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "%d:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    depends_on:
+      - prometheus
+`, promPort, grafPort)
+
+		os.WriteFile("prometheus.yml", []byte(`global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
 `), 0644)
 	}
 
