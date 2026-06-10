@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"log"
+	"net"
 	"os"
 
 	"github.com/charmbracelet/huh"
@@ -18,7 +19,6 @@ var initCmd = &cobra.Command{
 		var database string
 		var cache string
 
-		// ここで美しい対話フォームを作成します
 		form := huh.NewForm(
 			huh.NewGroup(
 				huh.NewSelect[string]().
@@ -55,7 +55,7 @@ var initCmd = &cobra.Command{
 		}
 
 		fmt.Printf("\n✨ Great! We are generating the docker-compose.yml for: Backend=%s, Database=%s, Cache=%s\n", backend, database, cache)
-
+		
 		generateDockerCompose(backend, database, cache)
 	},
 }
@@ -64,50 +64,65 @@ func init() {
 	rootCmd.AddCommand(initCmd)
 }
 
-// ユーザーの回答をもとにファイルを生成する関数
+func getAvailablePort(port int) int {
+	for {
+		addr := fmt.Sprintf(":%d", port)
+		l, err := net.Listen("tcp", addr)
+		if err == nil {
+			l.Close()
+			return port
+		}
+		fmt.Printf("⚠️  Port %d is in use, trying port %d...\n", port, port+1)
+		port++
+	}
+}
+
 func generateDockerCompose(backend, database, cache string) {
 	content := "version: '3.8'\nservices:\n"
-
+	
 	if database == "mysql" {
-		content += `  db:
+		port := getAvailablePort(3306)
+		content += fmt.Sprintf(`  db:
     image: mysql:8.0
     environment:
       MYSQL_ROOT_PASSWORD: rootpassword
       MYSQL_DATABASE: devdb
     ports:
-      - "3306:3306"
-`
+      - "%d:3306"
+`, port)
 	} else if database == "postgres" {
-		content += `  db:
+		port := getAvailablePort(5432)
+		content += fmt.Sprintf(`  db:
     image: postgres:15
     environment:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
       POSTGRES_DB: devdb
     ports:
-      - "5432:5432"
-`
+      - "%d:5432"
+`, port)
 	}
 
 	if cache == "redis" {
-		content += `  redis:
+		port := getAvailablePort(6379)
+		content += fmt.Sprintf(`  redis:
     image: redis:alpine
     ports:
-      - "6379:6379"
-`
+      - "%d:6379"
+`, port)
 	}
 
 	if backend == "node" {
-		content += `  api:
+		port := getAvailablePort(3000)
+		content += fmt.Sprintf(`  api:
     image: node:18-alpine
     working_dir: /app
     volumes:
       - .:/app
     command: sh -c "npm install && npm start"
     ports:
-      - "3000:3000"
-`
-		// アプリの雛形も一緒に作ってあげます
+      - "%d:3000"
+`, port)
 		os.WriteFile("package.json", []byte(`{
   "name": "dev-box-node",
   "version": "1.0.0",
@@ -121,15 +136,16 @@ app.listen(3000, () => console.log('Server running on port 3000'));
 `), 0644)
 
 	} else if backend == "python" {
-		content += `  api:
+		port := getAvailablePort(8000)
+		content += fmt.Sprintf(`  api:
     image: python:3.11-slim
     working_dir: /app
     volumes:
       - .:/app
     command: sh -c "pip install -r requirements.txt && uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
     ports:
-      - "8000:8000"
-`
+      - "%d:8000"
+`, port)
 		os.WriteFile("requirements.txt", []byte("fastapi\nuvicorn\n"), 0644)
 		os.WriteFile("main.py", []byte(`from fastapi import FastAPI
 app = FastAPI()
@@ -145,5 +161,5 @@ def read_root():
 		fmt.Println("Error writing docker-compose.yml:", err)
 		return
 	}
-	fmt.Println("✅ Successfully generated docker-compose.yml and necessary source files!")
+	fmt.Println("✅ Successfully generated docker-compose.yml with conflict-free ports!")
 }
