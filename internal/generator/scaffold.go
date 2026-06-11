@@ -75,9 +75,9 @@ func copyScaffoldFiles(templateDir string, destPrefix string, data any, out map[
 			return err
 		}
 
-		relPath = strings.ReplaceAll(relPath, "\\", "/")
+		relPath = filepath.ToSlash(relPath)
 		destPath := filepath.Join(destPrefix, relPath)
-		destPath = strings.ReplaceAll(destPath, "\\", "/")
+		destPath = filepath.ToSlash(destPath)
 
 		if strings.HasSuffix(destPath, ".tmpl") {
 			destPath = strings.TrimSuffix(destPath, ".tmpl")

@@ -1,12 +1,14 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 
+	"github.com/Sousuke-Naritomi/dev-box/internal/fs"
 	"github.com/Sousuke-Naritomi/dev-box/internal/generator"
 )
 
@@ -53,6 +55,16 @@ func runK8s(cmd *cobra.Command, args []string) error {
 
 	fmt.Println("\n✨ Generating Kubernetes manifests...")
 
+	if err := runK8sLogic(ctx, frontend, backend, database, cache, app.FS); err != nil {
+		return err
+	}
+
+	fmt.Println("✅ Generated Kubernetes manifests in k8s-manifests/ directory!")
+	fmt.Println("💡 Create a Secret named 'db-secret' for database passwords before applying.")
+	return nil
+}
+
+func runK8sLogic(ctx context.Context, frontend, backend, database, cache string, fileSystem fs.FileSystem) error {
 	manifests, err := generator.GenerateK8sManifests(frontend, backend, database, cache)
 	if err != nil {
 		return fmt.Errorf("generating k8s manifests: %w", err)
@@ -63,12 +75,10 @@ func runK8s(cmd *cobra.Command, args []string) error {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		if err := app.FS.WriteFile(filepath.Join(outDir, name), []byte(fd.Content), fd.Perm); err != nil {
+		if err := fileSystem.WriteFile(filepath.Join(outDir, name), []byte(fd.Content), fd.Perm); err != nil {
 			return err
 		}
 	}
 
-	fmt.Println("✅ Generated Kubernetes manifests in k8s-manifests/ directory!")
-	fmt.Println("💡 Create a Secret named 'db-secret' for database passwords before applying.")
 	return nil
 }

@@ -1,12 +1,14 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 
+	"github.com/Sousuke-Naritomi/dev-box/internal/fs"
 	"github.com/Sousuke-Naritomi/dev-box/internal/generator"
 )
 
@@ -45,6 +47,16 @@ func runDeploy(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("\n☁️  Generating Terraform configuration for %s...\n", provider)
 
+	if err := runDeployLogic(ctx, provider, app.FS); err != nil {
+		return err
+	}
+
+	fmt.Println("✅ Successfully generated Terraform files in terraform/ directory!")
+	fmt.Println("👉 Next steps: cd terraform && terraform init && terraform plan")
+	return nil
+}
+
+func runDeployLogic(ctx context.Context, provider string, fileSystem fs.FileSystem) error {
 	files, err := generator.GenerateTerraform(provider)
 	if err != nil {
 		return fmt.Errorf("generating terraform: %w", err)
@@ -55,12 +67,10 @@ func runDeploy(cmd *cobra.Command, args []string) error {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		if err := app.FS.WriteFile(filepath.Join(outDir, name), []byte(fd.Content), fd.Perm); err != nil {
+		if err := fileSystem.WriteFile(filepath.Join(outDir, name), []byte(fd.Content), fd.Perm); err != nil {
 			return err
 		}
 	}
 
-	fmt.Println("✅ Successfully generated Terraform files in terraform/ directory!")
-	fmt.Println("👉 Next steps: cd terraform && terraform init && terraform plan")
 	return nil
 }
