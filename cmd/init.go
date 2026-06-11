@@ -29,6 +29,7 @@ func init() {
 	initCmd.Flags().Bool("localstack", false, "Include LocalStack")
 	initCmd.Flags().Bool("monitoring", false, "Include Monitoring (Prometheus + Grafana + Loki)")
 	initCmd.Flags().Bool("cicd", false, "Include CI/CD Pipeline")
+	initCmd.Flags().Bool("force", false, "Overwrite existing files without prompting")
 	rootCmd.AddCommand(initCmd)
 }
 
@@ -43,6 +44,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	cfg.LocalStack, _ = cmd.Flags().GetBool("localstack")
 	cfg.Monitoring, _ = cmd.Flags().GetBool("monitoring")
 	cfg.CICD, _ = cmd.Flags().GetBool("cicd")
+	cfg.Force, _ = cmd.Flags().GetBool("force")
 
 	if cfg.Frontend != "" && cfg.Frontend != "none" {
 		if _, ok := registry.SupportedFrontends[cfg.Frontend]; !ok {
@@ -181,6 +183,28 @@ func runInitLogic(cfg config.ProjectConfig, fileSystem fs.FileSystem) error {
 	}
 	for path, content := range scaffoldFiles {
 		filesToWrite[path] = content
+	}
+
+	var existingFiles []string
+	for path := range filesToWrite {
+		if fileSystem.Exists(path) {
+			existingFiles = append(existingFiles, path)
+		}
+	}
+
+	if len(existingFiles) > 0 && !cfg.Force {
+		var overwrite bool
+		err := huh.NewConfirm().
+			Title("既存のファイルが存在します。上書きしますか？ [y/N]").
+			Value(&overwrite).
+			Run()
+		if err != nil {
+			return fmt.Errorf("prompt cancelled: %w", err)
+		}
+		if !overwrite {
+			fmt.Println("❌ File generation aborted.")
+			return nil
+		}
 	}
 
 	for path, content := range filesToWrite {

@@ -11,4 +11,5 @@ type ProjectConfig struct {
 	LocalStack bool
 	Monitoring bool
 	CICD       bool
+	Force      bool // Skip overwrite prompts
 }

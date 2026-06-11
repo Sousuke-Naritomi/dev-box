@@ -17,6 +17,7 @@ func TestRunInitLogic_Success(t *testing.T) {
 		Database: "postgres",
 		Cache:    "redis",
 		Nginx:    true,
+		Force:    true,
 	}
 
 	err := runInitLogic(cfg, mockFS)
