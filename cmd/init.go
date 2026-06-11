@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"net"
@@ -101,26 +103,41 @@ func getAvailablePort(port int) int {
 	}
 }
 
+func generatePassword(length int) string {
+	bytes := make([]byte, length)
+	if _, err := rand.Read(bytes); err != nil {
+		return "fallback_Secure_Password_123!"
+	}
+	return hex.EncodeToString(bytes)
+}
+
 func generateDockerCompose(frontend, backend, database, cache string, monitoring bool, cicd bool) {
 	content := "version: '3.8'\nservices:\n"
+	envContent := ""
 	
 	if database == "mysql" {
 		port := getAvailablePort(3306)
+		dbPassword := generatePassword(8)
+		envContent += fmt.Sprintf("MYSQL_ROOT_PASSWORD=%s\n", dbPassword)
+
 		content += fmt.Sprintf(`  db:
     image: mysql:8.0
     environment:
-      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: devdb
     ports:
       - "%d:3306"
 `, port)
 	} else if database == "postgres" {
 		port := getAvailablePort(5432)
+		dbPassword := generatePassword(8)
+		envContent += fmt.Sprintf("POSTGRES_PASSWORD=%s\n", dbPassword)
+
 		content += fmt.Sprintf(`  db:
     image: postgres:15
     environment:
       POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: devdb
     ports:
       - "%d:5432"
@@ -270,6 +287,9 @@ echo "Hello from dev-box PHP Environment!";
 	if monitoring {
 		promPort := getAvailablePort(9090)
 		grafPort := getAvailablePort(3001)
+		grafPassword := generatePassword(8)
+		envContent += fmt.Sprintf("GRAFANA_PASSWORD=%s\n", grafPassword)
+
 		content += fmt.Sprintf(`  prometheus:
     image: prom/prometheus:latest
     volumes:
@@ -281,7 +301,7 @@ echo "Hello from dev-box PHP Environment!";
     ports:
       - "%d:3000"
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
     depends_on:
       - prometheus
 `, promPort, grafPort)
@@ -300,6 +320,16 @@ scrape_configs:
 	if err != nil {
 		fmt.Println("❌ Error writing docker-compose.yml:", err)
 		return
+	}
+
+	if envContent != "" {
+		os.WriteFile(".env", []byte(envContent), 0644)
+		// Check if .gitignore exists, append or create
+		f, err := os.OpenFile(".gitignore", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err == nil {
+			f.WriteString("\n# Ignore env files containing secrets\n.env\n")
+			f.Close()
+		}
 	}
 
 	if cicd {
@@ -339,4 +369,7 @@ jobs:
 	}
 
 	fmt.Println("✅ Successfully generated local environment configuration!")
+	if envContent != "" {
+		fmt.Println("🔒 Security Note: A secure .env file was generated and added to .gitignore. Do not commit it to version control!")
+	}
 }
