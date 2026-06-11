@@ -456,7 +456,22 @@ on:
     branches: [ "main" ]
 
 jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          ignore-unfixed: true
+          format: 'table'
+          severity: 'CRITICAL,HIGH'
+
   build-and-test:
+    needs: security-scan
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
@@ -476,7 +491,7 @@ jobs:
       run: docker-compose down
 `
 			os.WriteFile(filepath.Join(".github", "workflows", "deploy.yml"), []byte(workflowContent), 0644)
-			fmt.Println("✅ Successfully generated .github/workflows/deploy.yml CI/CD pipeline!")
+			fmt.Println("✅ Successfully generated .github/workflows/deploy.yml CI/CD pipeline (with Trivy Security Scan)!")
 		}
 	}
 
