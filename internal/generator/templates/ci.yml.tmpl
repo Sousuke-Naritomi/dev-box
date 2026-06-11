@@ -56,14 +56,14 @@ jobs:
       - name: Verify API response
         run: |
           API_PORT=$(docker compose port api {{ .BackendPort }} | awk -F: '{print $NF}' | head -n 1)
-          STATUS=$(curl -sf -o /dev/null -w "%%{http_code}" "http://localhost:${API_PORT}/health" || echo "000")
+          STATUS=$(curl -sf -o /dev/null -w "%{http_code}" "http://localhost:${API_PORT}/health" || echo "000")
           echo "Health check response: $STATUS"
           test "$STATUS" = "200"
 {{- else if .HasFrontend }}
       - name: Verify frontend response
         run: |
           FRONTEND_PORT=$(docker compose port frontend {{ .FrontendPort }} | awk -F: '{print $NF}' | head -n 1)
-          STATUS=$(curl -sf -o /dev/null -w "%%{http_code}" "http://localhost:${FRONTEND_PORT}/" || echo "000")
+          STATUS=$(curl -sf -o /dev/null -w "%{http_code}" "http://localhost:${FRONTEND_PORT}/" || echo "000")
           echo "Frontend response: $STATUS"
           test "$STATUS" = "200"
 {{- else }}
