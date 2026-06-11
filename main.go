@@ -1,6 +1,6 @@
 package main
 
-import "dev-box/cmd"
+import "github.com/Sousuke-Naritomi/dev-box/cmd"
 
 func main() {
 	cmd.Execute()

@@ -2,20 +2,29 @@ package cmd
 
 import (
 	"fmt"
-	"log"
-	"os"
+	"path/filepath"
 
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
+
+	"github.com/Sousuke-Naritomi/dev-box/internal/generator"
 )
 
 var deployCmd = &cobra.Command{
 	Use:   "deploy",
 	Short: "Generate Terraform files for cloud deployment",
-	Long:  `Run an interactive prompt to generate main.tf for AWS, GCP, or Azure.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		var provider string
+	Long:  `Run an interactive prompt to generate Terraform configurations for AWS, GCP, or Azure.`,
+	RunE:  runDeploy,
+}
 
+func init() {
+	deployCmd.Flags().String("provider", "", "Cloud provider to deploy to (aws, gcp, azure)")
+	rootCmd.AddCommand(deployCmd)
+}
+
+func runDeploy(cmd *cobra.Command, args []string) error {
+	provider, _ := cmd.Flags().GetString("provider")
+	if provider == "" {
 		form := huh.NewForm(
 			huh.NewGroup(
 				huh.NewSelect[string]().
@@ -24,121 +33,30 @@ var deployCmd = &cobra.Command{
 						huh.NewOption("AWS (Amazon Web Services)", "aws"),
 						huh.NewOption("GCP (Google Cloud Platform)", "gcp"),
 						huh.NewOption("Azure (Microsoft Azure)", "azure"),
-					).
-					Value(&provider),
+					).Value(&provider),
 			),
 		)
 
-		err := form.Run()
-		if err != nil {
-			log.Fatal(err)
+		if err := form.Run(); err != nil {
+			return fmt.Errorf("form cancelled: %w", err)
 		}
-
-		fmt.Printf("\n☁️  Generating Terraform configuration for %s...\n", provider)
-		generateTerraform(provider)
-	},
-}
-
-func init() {
-	rootCmd.AddCommand(deployCmd)
-}
-
-func generateTerraform(provider string) {
-	var content string
-
-	if provider == "aws" {
-		content = `terraform {
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
-    }
-  }
-}
-
-provider "aws" {
-  region = "ap-northeast-1"
-}
-
-resource "aws_instance" "dev_box_server" {
-  ami           = "ami-0bba69335379e17f8" # Ubuntu 22.04 LTS (Tokyo)
-  instance_type = "t3.micro"
-
-  tags = {
-    Name = "dev-box-server"
-  }
-
-  user_data = <<-EOF
-              #!/bin/bash
-              apt-get update
-              apt-get install -y docker.io docker-compose
-              systemctl start docker
-              systemctl enable docker
-              EOF
-}
-`
-	} else if provider == "gcp" {
-		content = `terraform {
-  required_providers {
-    google = {
-      source  = "hashicorp/google"
-      version = "~> 4.0"
-    }
-  }
-}
-
-provider "google" {
-  project = "your-gcp-project-id"
-  region  = "asia-northeast1"
-  zone    = "asia-northeast1-a"
-}
-
-resource "google_compute_instance" "dev_box_server" {
-  name         = "dev-box-server"
-  machine_type = "e2-micro"
-
-  boot_disk {
-    initialize_params {
-      image = "ubuntu-os-cloud/ubuntu-2204-lts"
-    }
-  }
-
-  network_interface {
-    network = "default"
-    access_config {
-      // Ephemeral IP
-    }
-  }
-
-  metadata_startup_script = "apt-get update && apt-get install -y docker.io docker-compose && systemctl start docker"
-}
-`
-	} else if provider == "azure" {
-		content = `terraform {
-  required_providers {
-    azurerm = {
-      source  = "hashicorp/azurerm"
-      version = "~> 3.0"
-    }
-  }
-}
-
-provider "azurerm" {
-  features {}
-}
-
-resource "azurerm_resource_group" "dev_box_rg" {
-  name     = "dev-box-resources"
-  location = "Japan East"
-}
-`
 	}
 
-	err := os.WriteFile("main.tf", []byte(content), 0644)
+	fmt.Printf("\n☁️  Generating Terraform configuration for %s...\n", provider)
+
+	files, err := generator.GenerateTerraform(provider)
 	if err != nil {
-		fmt.Println("❌ Error writing main.tf:", err)
-		return
+		return fmt.Errorf("generating terraform: %w", err)
 	}
-	fmt.Println("✅ Successfully generated main.tf!")
-	fmt.Println("👉 Next steps: run 'terraform init' and 'terraform apply'")
+
+	outDir := "terraform"
+	for name, content := range files {
+		if err := writeFile(filepath.Join(outDir, name), []byte(content)); err != nil {
+			return err
+		}
+	}
+
+	fmt.Println("✅ Successfully generated Terraform files in terraform/ directory!")
+	fmt.Println("👉 Next steps: cd terraform && terraform init && terraform plan")
+	return nil
 }
