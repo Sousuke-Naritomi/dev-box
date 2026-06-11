@@ -55,74 +55,81 @@ func runInit(cmd *cobra.Command, args []string) error {
 	cfg.CICD, _ = cmd.Flags().GetBool("cicd")
 	cfg.Force, _ = cmd.Flags().GetBool("force")
 
-	if frontendStr != "" || backendStr != "" || databaseStr != "" || cacheStr != "" {
-		if err := cfg.Validate(); err != nil {
-			return err
-		}
-	}
-
 	if cfg.Frontend == "" || cfg.Backend == "" || cfg.Database == "" || cfg.Cache == "" {
 		isTerminal := term.IsTerminal(int(os.Stdin.Fd()))
 		if !isTerminal && !cfg.Force {
 			return fmt.Errorf("non-interactive environment detected. Please provide all required flags or use --force")
 		}
 
-		var frontendStr, backendStr, databaseStr, cacheStr string
+		var fields []huh.Field
 
-		form := huh.NewForm(
-			huh.NewGroup(
-				huh.NewSelect[string]().
-					Title("Choose your Frontend Framework").
-					Options(
-						huh.NewOption("React (Vite)", "react"),
-						huh.NewOption("Vue.js (Vite)", "vue"),
-						huh.NewOption("None", "none"),
-					).Value(&frontendStr),
+		if frontendStr == "" {
+			fields = append(fields, huh.NewSelect[string]().
+				Title("Choose your Frontend Framework").
+				Options(
+					huh.NewOption("React (Vite)", "react"),
+					huh.NewOption("Vue.js (Vite)", "vue"),
+					huh.NewOption("None", "none"),
+				).Value(&frontendStr))
+		}
+		if backendStr == "" {
+			fields = append(fields, huh.NewSelect[string]().
+				Title("Choose your Backend Language").
+				Options(
+					huh.NewOption("Node.js (Express)", "node"),
+					huh.NewOption("Python (Flask)", "python"),
+					huh.NewOption("Go (net/http)", "go"),
+					huh.NewOption("PHP (Apache)", "php"),
+					huh.NewOption("Java (HttpServer)", "java"),
+					huh.NewOption("None", "none"),
+				).Value(&backendStr))
+		}
+		if databaseStr == "" {
+			fields = append(fields, huh.NewSelect[string]().
+				Title("Choose your Database").
+				Options(
+					huh.NewOption("MySQL", "mysql"),
+					huh.NewOption("PostgreSQL", "postgres"),
+					huh.NewOption("None", "none"),
+				).Value(&databaseStr))
+		}
+		if cacheStr == "" {
+			fields = append(fields, huh.NewSelect[string]().
+				Title("Choose your Cache").
+				Options(
+					huh.NewOption("Redis", "redis"),
+					huh.NewOption("None", "none"),
+				).Value(&cacheStr))
+		}
 
-				huh.NewSelect[string]().
-					Title("Choose your Backend Language").
-					Options(
-						huh.NewOption("Node.js (Express)", "node"),
-						huh.NewOption("Python (Flask)", "python"),
-						huh.NewOption("Go (net/http)", "go"),
-						huh.NewOption("PHP (Apache)", "php"),
-						huh.NewOption("Java (HttpServer)", "java"),
-						huh.NewOption("None", "none"),
-					).Value(&backendStr),
+		if !cmd.Flags().Changed("nginx") {
+			fields = append(fields, huh.NewConfirm().Title("Include Nginx Reverse Proxy?").Value(&cfg.Nginx))
+		}
+		if !cmd.Flags().Changed("localstack") {
+			fields = append(fields, huh.NewConfirm().Title("Include LocalStack? (AWS Local Emulator)").Value(&cfg.LocalStack))
+		}
+		if !cmd.Flags().Changed("monitoring") {
+			fields = append(fields, huh.NewConfirm().Title("Include Monitoring? (Prometheus + Grafana + Loki)").Value(&cfg.Monitoring))
+		}
+		if !cmd.Flags().Changed("cicd") {
+			fields = append(fields, huh.NewConfirm().Title("Include CI/CD Pipeline? (GitHub Actions)").Value(&cfg.CICD))
+		}
 
-				huh.NewSelect[string]().
-					Title("Choose your Database").
-					Options(
-						huh.NewOption("MySQL", "mysql"),
-						huh.NewOption("PostgreSQL", "postgres"),
-						huh.NewOption("None", "none"),
-					).Value(&databaseStr),
-
-				huh.NewSelect[string]().
-					Title("Choose your Cache").
-					Options(
-						huh.NewOption("Redis", "redis"),
-						huh.NewOption("None", "none"),
-					).Value(&cacheStr),
-
-				huh.NewConfirm().Title("Include Nginx Reverse Proxy?").Value(&cfg.Nginx),
-				huh.NewConfirm().Title("Include LocalStack? (AWS Local Emulator)").Value(&cfg.LocalStack),
-				huh.NewConfirm().Title("Include Monitoring? (Prometheus + Grafana + Loki)").Value(&cfg.Monitoring),
-				huh.NewConfirm().Title("Include CI/CD Pipeline? (GitHub Actions)").Value(&cfg.CICD),
-			),
-		)
-
-		if err := form.Run(); err != nil {
-			return fmt.Errorf("form cancelled: %w", err)
+		if len(fields) > 0 {
+			form := huh.NewForm(huh.NewGroup(fields...))
+			if err := form.Run(); err != nil {
+				return fmt.Errorf("form cancelled: %w", err)
+			}
 		}
 
 		cfg.Frontend = config.FrontendType(frontendStr)
 		cfg.Backend = config.BackendType(backendStr)
 		cfg.Database = config.DatabaseType(databaseStr)
 		cfg.Cache = config.CacheType(cacheStr)
-		if err := cfg.Validate(); err != nil {
-			return err
-		}
+	}
+
+	if err := cfg.Validate(); err != nil {
+		return err
 	}
 
 	return runInitLogic(cmd.Context(), cfg, app.FS, app.Gen)

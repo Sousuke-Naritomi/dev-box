@@ -6,6 +6,7 @@ import (
 	"text/template"
 
 	"github.com/Sousuke-Naritomi/dev-box/internal/config"
+	"github.com/Sousuke-Naritomi/dev-box/internal/registry"
 )
 
 type k8sService struct {
@@ -23,7 +24,7 @@ type k8sService struct {
 
 // GenerateK8sManifests generates Kubernetes Deployment, Service, and PVC manifests
 // for the selected stack components. Returns a map of filename to FileDef content.
-func GenerateK8sManifests(frontend, backend, database, cache string) (map[string]FileDef, error) {
+func GenerateK8sManifests(cfg config.ProjectConfig) (map[string]FileDef, error) {
 	manifests := make(map[string]FileDef)
 
 	nsContent, err := FS.ReadFile("templates/k8s/namespace.yaml.tmpl")
@@ -40,43 +41,22 @@ func GenerateK8sManifests(frontend, backend, database, cache string) (map[string
 
 	var services []k8sService
 
-	if frontend == "react" || frontend == "vue" {
+	if f, ok := registry.SupportedFrontends[cfg.Frontend]; ok {
 		services = append(services, k8sService{
-			Name: "frontend", Image: "node:" + config.VersionNode, Port: 5173,
+			Name: "frontend", Image: f.Image, Port: f.InternalPort,
 			Replicas: 2, RunAsNonRoot: true, ServiceType: "LoadBalancer",
 		})
 	}
 
-	switch backend {
-	case "node":
+	if b, ok := registry.SupportedBackends[cfg.Backend]; ok {
 		services = append(services, k8sService{
-			Name: "api", Image: "node:" + config.VersionNode, Port: 3000,
-			Replicas: 2, RunAsNonRoot: true, ServiceType: "ClusterIP",
-		})
-	case "python":
-		services = append(services, k8sService{
-			Name: "api", Image: "python:" + config.VersionPython, Port: 8000,
-			Replicas: 2, RunAsNonRoot: true, ServiceType: "ClusterIP",
-		})
-	case "go":
-		services = append(services, k8sService{
-			Name: "api", Image: "golang:" + config.VersionGo, Port: 8080,
-			Replicas: 2, RunAsNonRoot: true, ServiceType: "ClusterIP",
-		})
-	case "php":
-		services = append(services, k8sService{
-			Name: "api", Image: "php:" + config.VersionPHP, Port: 80,
-			Replicas: 2, RunAsNonRoot: true, ServiceType: "ClusterIP",
-		})
-	case "java":
-		services = append(services, k8sService{
-			Name: "api", Image: "eclipse-temurin:" + config.VersionJava, Port: 8080,
+			Name: "api", Image: b.Image, Port: b.InternalPort,
 			Replicas: 2, RunAsNonRoot: true, ServiceType: "ClusterIP",
 		})
 	}
 
-	switch database {
-	case "mysql":
+	switch cfg.Database {
+	case config.DatabaseMySQL:
 		services = append(services, k8sService{
 			Name: "db", Image: "mysql:" + config.VersionMySQL, Port: 3306,
 			Replicas: 1, RunAsNonRoot: false, HasDBSecret: true,
@@ -84,7 +64,7 @@ func GenerateK8sManifests(frontend, backend, database, cache string) (map[string
 			VolumeMountPath: "/var/lib/mysql", EnvPasswordKey: "MYSQL_ROOT_PASSWORD",
 			ServiceType: "ClusterIP",
 		})
-	case "postgres":
+	case config.DatabasePostgres:
 		services = append(services, k8sService{
 			Name: "db", Image: "postgres:" + config.VersionPostgres, Port: 5432,
 			Replicas: 1, RunAsNonRoot: false, HasDBSecret: true,
@@ -94,7 +74,7 @@ func GenerateK8sManifests(frontend, backend, database, cache string) (map[string
 		})
 	}
 
-	if cache == "redis" {
+	if cfg.Cache == config.CacheRedis {
 		services = append(services, k8sService{
 			Name: "cache", Image: "redis:" + config.VersionRedis, Port: 6379,
 			Replicas: 1, RunAsNonRoot: true, HasDBSecret: false,

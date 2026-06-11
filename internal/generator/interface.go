@@ -10,7 +10,7 @@ import (
 type Generator interface {
 	GenerateScaffold(cfg config.ProjectConfig) (map[string]FileDef, error)
 	GenerateTerraform(provider string) (map[string]FileDef, error)
-	GenerateK8sManifests(frontend, backend, database, cache string) (map[string]FileDef, error)
+	GenerateK8sManifests(cfg config.ProjectConfig) (map[string]FileDef, error)
 }
 
 // DefaultGenerator provides the standard implementation.
@@ -27,6 +27,6 @@ func (g *DefaultGenerator) GenerateTerraform(provider string) (map[string]FileDe
 }
 
 // GenerateK8sManifests implements Generator.
-func (g *DefaultGenerator) GenerateK8sManifests(frontend, backend, database, cache string) (map[string]FileDef, error) {
-	return GenerateK8sManifests(frontend, backend, database, cache)
+func (g *DefaultGenerator) GenerateK8sManifests(cfg config.ProjectConfig) (map[string]FileDef, error) {
+	return GenerateK8sManifests(cfg)
 }

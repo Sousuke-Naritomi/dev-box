@@ -3,10 +3,13 @@ package generator
 import (
 	"strings"
 	"testing"
+
+	"github.com/Sousuke-Naritomi/dev-box/internal/config"
 )
 
 func TestGenerateK8sManifests_Frontend(t *testing.T) {
-	manifests, err := GenerateK8sManifests("react", "none", "none", "none")
+	cfg := config.ProjectConfig{Frontend: config.FrontendReact, Backend: "none", Database: "none", Cache: "none"}
+	manifests, err := GenerateK8sManifests(cfg)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -35,7 +38,8 @@ func TestGenerateK8sManifests_DBWithPVC(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			manifests, err := GenerateK8sManifests("none", "none", tt.database, "none")
+			cfg := config.ProjectConfig{Frontend: "none", Backend: "none", Database: config.DatabaseType(tt.database), Cache: "none"}
+			manifests, err := GenerateK8sManifests(cfg)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -66,7 +70,8 @@ func TestGenerateK8sManifests_AllBackends(t *testing.T) {
 	backends := []string{"node", "python", "go", "php", "java"}
 	for _, backend := range backends {
 		t.Run(backend, func(t *testing.T) {
-			manifests, err := GenerateK8sManifests("none", backend, "none", "none")
+			cfg := config.ProjectConfig{Frontend: "none", Backend: config.BackendType(backend), Database: "none", Cache: "none"}
+			manifests, err := GenerateK8sManifests(cfg)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}

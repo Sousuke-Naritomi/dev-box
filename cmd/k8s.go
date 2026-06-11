@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 
+	"github.com/Sousuke-Naritomi/dev-box/internal/config"
 	"github.com/Sousuke-Naritomi/dev-box/internal/fs"
 	"github.com/Sousuke-Naritomi/dev-box/internal/generator"
 )
@@ -29,40 +30,65 @@ func init() {
 
 func runK8s(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
-	frontend, _ := cmd.Flags().GetString("frontend")
-	backend, _ := cmd.Flags().GetString("backend")
-	database, _ := cmd.Flags().GetString("database")
-	cache, _ := cmd.Flags().GetString("cache")
+	
+	cfg := config.ProjectConfig{}
+	frontendStr, _ := cmd.Flags().GetString("frontend")
+	backendStr, _ := cmd.Flags().GetString("backend")
+	databaseStr, _ := cmd.Flags().GetString("database")
+	cacheStr, _ := cmd.Flags().GetString("cache")
 
-	if frontend == "" || backend == "" || database == "" || cache == "" {
-		form := huh.NewForm(
-			huh.NewGroup(
-				huh.NewSelect[string]().Title("Frontend for K8s?").
-					Options(huh.NewOption("React", "react"), huh.NewOption("Vue", "vue"), huh.NewOption("None", "none")).Value(&frontend),
-				huh.NewSelect[string]().Title("Backend for K8s?").
-					Options(
-						huh.NewOption("Node.js (Express)", "node"),
-						huh.NewOption("Python (Flask)", "python"),
-						huh.NewOption("Go (net/http)", "go"),
-						huh.NewOption("PHP (Apache)", "php"),
-						huh.NewOption("Java (HttpServer)", "java"),
-						huh.NewOption("None", "none"),
-					).Value(&backend),
-				huh.NewSelect[string]().Title("Database for K8s?").
-					Options(huh.NewOption("MySQL", "mysql"), huh.NewOption("PostgreSQL", "postgres"), huh.NewOption("None", "none")).Value(&database),
-				huh.NewSelect[string]().Title("Cache for K8s?").
-					Options(huh.NewOption("Redis", "redis"), huh.NewOption("None", "none")).Value(&cache),
-			),
-		)
+	cfg.Frontend = config.FrontendType(frontendStr)
+	cfg.Backend = config.BackendType(backendStr)
+	cfg.Database = config.DatabaseType(databaseStr)
+	cfg.Cache = config.CacheType(cacheStr)
 
-		if err := form.Run(); err != nil {
-			return fmt.Errorf("form cancelled: %w", err)
+	if cfg.Frontend == "" || cfg.Backend == "" || cfg.Database == "" || cfg.Cache == "" {
+		var fields []huh.Field
+
+		if frontendStr == "" {
+			fields = append(fields, huh.NewSelect[string]().Title("Frontend for K8s?").
+				Options(huh.NewOption("React", "react"), huh.NewOption("Vue", "vue"), huh.NewOption("None", "none")).Value(&frontendStr))
 		}
+		if backendStr == "" {
+			fields = append(fields, huh.NewSelect[string]().Title("Backend for K8s?").
+				Options(
+					huh.NewOption("Node.js (Express)", "node"),
+					huh.NewOption("Python (Flask)", "python"),
+					huh.NewOption("Go (net/http)", "go"),
+					huh.NewOption("PHP (Apache)", "php"),
+					huh.NewOption("Java (HttpServer)", "java"),
+					huh.NewOption("None", "none"),
+				).Value(&backendStr))
+		}
+		if databaseStr == "" {
+			fields = append(fields, huh.NewSelect[string]().Title("Database for K8s?").
+				Options(huh.NewOption("MySQL", "mysql"), huh.NewOption("PostgreSQL", "postgres"), huh.NewOption("None", "none")).Value(&databaseStr))
+		}
+		if cacheStr == "" {
+			fields = append(fields, huh.NewSelect[string]().Title("Cache for K8s?").
+				Options(huh.NewOption("Redis", "redis"), huh.NewOption("None", "none")).Value(&cacheStr))
+		}
+
+		if len(fields) > 0 {
+			form := huh.NewForm(huh.NewGroup(fields...))
+			if err := form.Run(); err != nil {
+				return fmt.Errorf("form cancelled: %w", err)
+			}
+		}
+
+		cfg.Frontend = config.FrontendType(frontendStr)
+		cfg.Backend = config.BackendType(backendStr)
+		cfg.Database = config.DatabaseType(databaseStr)
+		cfg.Cache = config.CacheType(cacheStr)
+	}
+
+	if err := cfg.Validate(); err != nil {
+		return err
 	}
 
 	fmt.Println("\n✨ Generating Kubernetes manifests...")
 
-	if err := runK8sLogic(ctx, frontend, backend, database, cache, app.FS, app.Gen); err != nil {
+	if err := runK8sLogic(ctx, cfg, app.FS, app.Gen); err != nil {
 		return err
 	}
 
@@ -71,8 +97,8 @@ func runK8s(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func runK8sLogic(ctx context.Context, frontend, backend, database, cache string, fileSystem fs.FileSystem, gen generator.Generator) error {
-	manifests, err := gen.GenerateK8sManifests(frontend, backend, database, cache)
+func runK8sLogic(ctx context.Context, cfg config.ProjectConfig, fileSystem fs.FileSystem, gen generator.Generator) error {
+	manifests, err := gen.GenerateK8sManifests(cfg)
 	if err != nil {
 		return fmt.Errorf("generating k8s manifests: %w", err)
 	}

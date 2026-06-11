@@ -16,7 +16,7 @@ import (
 type MockGenerator struct {
 	ScaffoldFunc func(cfg config.ProjectConfig) (map[string]generator.FileDef, error)
 	TfFunc       func(provider string) (map[string]generator.FileDef, error)
-	K8sFunc      func(frontend, backend, database, cache string) (map[string]generator.FileDef, error)
+	K8sFunc      func(cfg config.ProjectConfig) (map[string]generator.FileDef, error)
 }
 
 func (m *MockGenerator) GenerateScaffold(cfg config.ProjectConfig) (map[string]generator.FileDef, error) {
@@ -33,9 +33,9 @@ func (m *MockGenerator) GenerateTerraform(provider string) (map[string]generator
 	return map[string]generator.FileDef{}, nil
 }
 
-func (m *MockGenerator) GenerateK8sManifests(frontend, backend, database, cache string) (map[string]generator.FileDef, error) {
+func (m *MockGenerator) GenerateK8sManifests(cfg config.ProjectConfig) (map[string]generator.FileDef, error) {
 	if m.K8sFunc != nil {
-		return m.K8sFunc(frontend, backend, database, cache)
+		return m.K8sFunc(cfg)
 	}
 	return map[string]generator.FileDef{}, nil
 }
