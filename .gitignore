@@ -1,0 +1,12 @@
+# Build outputs
+dev-box
+dev-box.exe
+*.exe
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

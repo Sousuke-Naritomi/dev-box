@@ -1,10 +1,11 @@
-module dev-box
+module github.com/Sousuke-Naritomi/dev-box
 
 go 1.26.4
 
 require (
 	github.com/charmbracelet/huh v1.0.0
 	github.com/spf13/cobra v1.10.2
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
