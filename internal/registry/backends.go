@@ -3,13 +3,13 @@ package registry
 import "github.com/Sousuke-Naritomi/dev-box/internal/config"
 
 type BackendFramework struct {
-	ID             string
-	Name           string
-	Image          string
-	InternalPort   int
-	Command        string
-	Volumes        []string
-	TemplateDir    string
+	ID           string
+	Name         string
+	Image        string
+	InternalPort int
+	Command      string
+	Volumes      []string
+	TemplateDir  string
 }
 
 var SupportedBackends = map[config.BackendType]BackendFramework{

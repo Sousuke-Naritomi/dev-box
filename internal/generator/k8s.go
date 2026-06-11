@@ -60,7 +60,7 @@ func GenerateK8sManifests(cfg config.ProjectConfig) (map[string]FileDef, error) 
 		services = append(services, k8sService{
 			Name: "db", Image: "mysql:" + config.VersionMySQL, Port: 3306,
 			Replicas: 1, RunAsNonRoot: false, HasDBSecret: true,
-			HealthCmd: []string{"mysqladmin", "ping", "-h", "localhost"},
+			HealthCmd:       []string{"mysqladmin", "ping", "-h", "localhost"},
 			VolumeMountPath: "/var/lib/mysql", EnvPasswordKey: "MYSQL_ROOT_PASSWORD",
 			ServiceType: "ClusterIP",
 		})
@@ -68,7 +68,7 @@ func GenerateK8sManifests(cfg config.ProjectConfig) (map[string]FileDef, error) 
 		services = append(services, k8sService{
 			Name: "db", Image: "postgres:" + config.VersionPostgres, Port: 5432,
 			Replicas: 1, RunAsNonRoot: false, HasDBSecret: true,
-			HealthCmd: []string{"pg_isready", "-U", "postgres"},
+			HealthCmd:       []string{"pg_isready", "-U", "postgres"},
 			VolumeMountPath: "/var/lib/postgresql/data", EnvPasswordKey: "POSTGRES_PASSWORD",
 			ServiceType: "ClusterIP",
 		})

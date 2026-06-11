@@ -30,7 +30,7 @@ func init() {
 
 func runK8s(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
-	
+
 	cfg := config.ProjectConfig{}
 	frontendStr, _ := cmd.Flags().GetString("frontend")
 	backendStr, _ := cmd.Flags().GetString("backend")

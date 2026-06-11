@@ -263,4 +263,3 @@ func runInitLogic(ctx context.Context, cfg config.ProjectConfig, fileSystem fs.F
 	}
 	return nil
 }
-

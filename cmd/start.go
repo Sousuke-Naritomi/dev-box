@@ -30,7 +30,7 @@ var startCmd = &cobra.Command{
 
 		fmt.Println("✅ Environment is up and running!")
 		fmt.Println("📡 Assigned Ports:")
-		
+
 		// Run `docker compose ps` to show the dynamically allocated ports
 		psCmd := exec.Command(dockerCmd, "compose", "ps")
 		psCmd.Stdout = os.Stdout

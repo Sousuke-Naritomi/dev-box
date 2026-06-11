@@ -13,9 +13,9 @@ import (
 
 // ComposeData holds resolved configuration for docker-compose template rendering.
 type ComposeData struct {
-	Config          config.ProjectConfig
-	Frontend        *registry.FrontendFramework
-	Backend         *registry.BackendFramework
+	Config   config.ProjectConfig
+	Frontend *registry.FrontendFramework
+	Backend  *registry.BackendFramework
 	// Ports are now assigned dynamically by Docker Compose (using "0:<internal_port>")
 	// Internal ports are read directly from registry Framework definitions.
 
