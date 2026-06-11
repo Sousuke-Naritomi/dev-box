@@ -4,8 +4,17 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/Sousuke-Naritomi/dev-box/internal/fs"
 	"github.com/spf13/cobra"
 )
+
+type App struct {
+	FS fs.FileSystem
+}
+
+var app = &App{
+	FS: fs.NewOSFileSystem(),
+}
 
 var rootCmd = &cobra.Command{
 	Use:   "dev-box",

@@ -51,7 +51,7 @@ func runDeploy(cmd *cobra.Command, args []string) error {
 
 	outDir := "terraform"
 	for name, content := range files {
-		if err := writeFile(filepath.Join(outDir, name), []byte(content)); err != nil {
+		if err := app.FS.WriteFile(filepath.Join(outDir, name), []byte(content), 0644); err != nil {
 			return err
 		}
 	}

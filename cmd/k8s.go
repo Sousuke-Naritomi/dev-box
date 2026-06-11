@@ -59,7 +59,7 @@ func runK8s(cmd *cobra.Command, args []string) error {
 
 	outDir := "k8s-manifests"
 	for name, content := range manifests {
-		if err := writeFile(filepath.Join(outDir, name), []byte(content)); err != nil {
+		if err := app.FS.WriteFile(filepath.Join(outDir, name), []byte(content), 0644); err != nil {
 			return err
 		}
 	}

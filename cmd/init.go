@@ -44,6 +44,17 @@ func runInit(cmd *cobra.Command, args []string) error {
 	cfg.Monitoring, _ = cmd.Flags().GetBool("monitoring")
 	cfg.CICD, _ = cmd.Flags().GetBool("cicd")
 
+	if cfg.Frontend != "" && cfg.Frontend != "none" {
+		if _, ok := registry.SupportedFrontends[cfg.Frontend]; !ok {
+			return fmt.Errorf("unsupported frontend: %s", cfg.Frontend)
+		}
+	}
+	if cfg.Backend != "" && cfg.Backend != "none" {
+		if _, ok := registry.SupportedBackends[cfg.Backend]; !ok {
+			return fmt.Errorf("unsupported backend: %s", cfg.Backend)
+		}
+	}
+
 	if cfg.Frontend == "" || cfg.Backend == "" || cfg.Database == "" || cfg.Cache == "" {
 		form := huh.NewForm(
 			huh.NewGroup(
@@ -93,6 +104,10 @@ func runInit(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	return runInitLogic(cfg, app.FS)
+}
+
+func runInitLogic(cfg config.ProjectConfig, fileSystem fs.FileSystem) error {
 	fmt.Printf("\n✨ Generating environment for: Frontend=%s, Backend=%s, Database=%s\n", cfg.Frontend, cfg.Backend, cfg.Database)
 
 	// Resolve ports and passwords
@@ -168,29 +183,6 @@ func runInit(cmd *cobra.Command, args []string) error {
 		filesToWrite[path] = content
 	}
 
-	fileSystem := fs.NewOSFileSystem()
-	var existingFiles []string
-	for path := range filesToWrite {
-		if fileSystem.Exists(path) {
-			existingFiles = append(existingFiles, path)
-		}
-	}
-
-	if len(existingFiles) > 0 {
-		var overwrite bool
-		err := huh.NewConfirm().
-			Title("既存のファイルが存在します。上書きしますか？ [y/N]").
-			Value(&overwrite).
-			Run()
-		if err != nil {
-			return fmt.Errorf("prompt cancelled: %w", err)
-		}
-		if !overwrite {
-			fmt.Println("❌ File generation aborted.")
-			return nil
-		}
-	}
-
 	for path, content := range filesToWrite {
 		if err := fileSystem.WriteFile(path, []byte(content), 0644); err != nil {
 			return fmt.Errorf("writing %s: %w", path, err)
@@ -205,11 +197,5 @@ func runInit(cmd *cobra.Command, args []string) error {
 		fmt.Println("✅ Generated .github/workflows/ci.yml")
 	}
 	return nil
-}
-
-// writeFile is a convenience function for commands that need to write files directly.
-func writeFile(path string, content []byte) error {
-	fileSystem := fs.NewOSFileSystem()
-	return fileSystem.WriteFile(path, content, 0644)
 }
 
