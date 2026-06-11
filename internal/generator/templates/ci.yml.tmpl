@@ -66,16 +66,30 @@ jobs:
       - name: Verify API response
         run: |
           API_PORT=$(docker compose port api {{ .BackendPort }} | awk -F: '{print $NF}' | head -n 1)
-          STATUS=$(curl -sf -o /dev/null -w "%{http_code}" "http://localhost:${API_PORT}/health" || echo "000")
-          echo "Health check response: $STATUS"
-          test "$STATUS" = "200"
+          for i in $(seq 1 30); do
+            STATUS=$(curl -sf -o /dev/null -w "%{http_code}" "http://localhost:${API_PORT}/health" || echo "000")
+            echo "API health check attempt $i/30: $STATUS"
+            if [ "$STATUS" = "200" ]; then
+              exit 0
+            fi
+            sleep 5
+          done
+          docker compose logs api
+          exit 1
 {{- else if .HasFrontend }}
       - name: Verify frontend response
         run: |
           FRONTEND_PORT=$(docker compose port frontend {{ .FrontendPort }} | awk -F: '{print $NF}' | head -n 1)
-          STATUS=$(curl -sf -o /dev/null -w "%{http_code}" "http://localhost:${FRONTEND_PORT}/" || echo "000")
-          echo "Frontend response: $STATUS"
-          test "$STATUS" = "200"
+          for i in $(seq 1 30); do
+            STATUS=$(curl -sf -o /dev/null -w "%{http_code}" "http://localhost:${FRONTEND_PORT}/" || echo "000")
+            echo "Frontend check attempt $i/30: $STATUS"
+            if [ "$STATUS" = "200" ]; then
+              exit 0
+            fi
+            sleep 5
+          done
+          docker compose logs frontend
+          exit 1
 {{- else }}
       - name: Verify compose project
         run: docker compose ps

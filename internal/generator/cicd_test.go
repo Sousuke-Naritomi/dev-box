@@ -24,6 +24,8 @@ func TestGenerateCICD_BackendUsesDynamicComposePort(t *testing.T) {
 		"aquasecurity/trivy-action@0.32.0",
 		"docker compose port api 3000",
 		"http://localhost:${API_PORT}/health",
+		"API health check attempt $i/30",
+		"docker compose logs api",
 		`-w "%{http_code}"`,
 	}
 	for _, check := range checks {
@@ -61,6 +63,12 @@ func TestGenerateCICD_FrontendOnlyUsesFrontendProbe(t *testing.T) {
 	}
 	if !strings.Contains(result, `-w "%{http_code}"`) {
 		t.Fatal("expected generated CI to read the HTTP status code")
+	}
+	if !strings.Contains(result, "Frontend check attempt $i/30") {
+		t.Fatal("expected generated CI to retry frontend readiness checks")
+	}
+	if !strings.Contains(result, "docker compose logs frontend") {
+		t.Fatal("expected generated CI to print frontend logs on readiness failure")
 	}
 	if strings.Contains(result, "docker compose port api") {
 		t.Fatal("frontend-only CI must not inspect the api service")
