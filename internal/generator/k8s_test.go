@@ -23,6 +23,18 @@ func TestGenerateK8sManifests_Frontend(t *testing.T) {
 			t.Errorf("expected frontend manifest to contain %q", check)
 		}
 	}
+	if !strings.Contains(content.Content, "image: dev-box-frontend:latest") {
+		t.Error("expected frontend manifest to use the generated app image")
+	}
+	if !strings.Contains(content.Content, "imagePullPolicy: IfNotPresent") {
+		t.Error("expected frontend manifest to support locally built images")
+	}
+	if !strings.Contains(content.Content, "path: /") {
+		t.Error("expected frontend probe to target /")
+	}
+	if strings.Contains(content.Content, "path: /health") {
+		t.Error("frontend probe should not assume a /health endpoint")
+	}
 }
 
 func TestGenerateK8sManifests_DBWithPVC(t *testing.T) {
@@ -84,6 +96,12 @@ func TestGenerateK8sManifests_AllBackends(t *testing.T) {
 			}
 			if !strings.Contains(content.Content, "livenessProbe:") {
 				t.Error("expected manifest to contain livenessProbe")
+			}
+			if !strings.Contains(content.Content, "image: dev-box-api:latest") {
+				t.Error("expected backend manifest to use the generated app image")
+			}
+			if !strings.Contains(content.Content, "path: /health") {
+				t.Error("expected backend probe to target /health")
 			}
 		})
 	}

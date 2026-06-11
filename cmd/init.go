@@ -175,10 +175,14 @@ func runInitLogic(ctx context.Context, cfg config.ProjectConfig, fileSystem fs.F
 	if b, ok := registry.SupportedBackends[cfg.Backend]; ok {
 		backendInternalPort = b.InternalPort
 	}
+	frontendInternalPort := 0
+	if f, ok := registry.SupportedFrontends[cfg.Frontend]; ok {
+		frontendInternalPort = f.InternalPort
+	}
 
 	// Generate nginx config
 	if cfg.Nginx && (cfg.Frontend != "none" || cfg.Backend != "none") {
-		nginxConf, err := generator.GenerateNginxConf(cfg, backendInternalPort)
+		nginxConf, err := generator.GenerateNginxConf(cfg, backendInternalPort, frontendInternalPort)
 		if err != nil {
 			return fmt.Errorf("generating nginx conf: %w", err)
 		}
@@ -202,7 +206,7 @@ func runInitLogic(ctx context.Context, cfg config.ProjectConfig, fileSystem fs.F
 
 	// Generate CI/CD
 	if cfg.CICD {
-		cicdContent, err := generator.GenerateCICD(backendInternalPort)
+		cicdContent, err := generator.GenerateCICD(cfg, backendInternalPort, frontendInternalPort)
 		if err != nil {
 			return err
 		}

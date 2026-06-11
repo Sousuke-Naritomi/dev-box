@@ -22,7 +22,7 @@ Docker Compose、Kubernetesマニフェスト、Terraform設定からソース�
 
 | ツール | バージョン |
 |--------|-----------|
-| Go | 1.22 以上 |
+| Go | 1.25 以上 |
 | Docker または Podman | 最新版（Compose V2 互換） |
 | Terraform | 1.0 以上（`deploy` コマンド使用時） |
 

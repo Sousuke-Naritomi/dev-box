@@ -11,8 +11,12 @@ http {
     keepalive_timeout 65;
 
     # Rate limiting
+{{- if .HasBackend }}
     limit_req_zone $binary_remote_addr zone=api_limit:10m rate=10r/s;
+{{- end }}
+{{- if .HasFrontend }}
     limit_req_zone $binary_remote_addr zone=general_limit:10m rate=30r/s;
+{{- end }}
 
     # Gzip compression
     gzip on;
@@ -22,13 +26,15 @@ http {
     gzip_min_length 256;
     gzip_types text/plain text/css application/json application/javascript text/xml application/xml image/svg+xml;
 
+{{- if .HasBackend }}
     upstream backend {
         server api:{{ .BackendPort }};
     }
+{{- end }}
 {{- if .HasFrontend }}
 
     upstream frontend {
-        server frontend:5173;
+        server frontend:{{ .FrontendPort }};
     }
 {{- end }}
 
@@ -53,6 +59,7 @@ http {
         }
 {{- end }}
 
+{{- if .HasBackend }}
         location /api/ {
             limit_req zone=api_limit burst=10 nodelay;
             proxy_pass http://backend/;
@@ -64,6 +71,7 @@ http {
             proxy_set_header Connection "upgrade";
             proxy_http_version 1.1;
         }
+{{- end }}
 
         location /health {
             access_log off;

@@ -12,11 +12,13 @@ import (
 type k8sService struct {
 	Name            string
 	Image           string
+	ImagePullPolicy string
 	Port            int
 	Replicas        int
 	RunAsNonRoot    bool
 	HasDBSecret     bool
 	HealthCmd       []string
+	HealthPath      string
 	VolumeMountPath string
 	EnvPasswordKey  string
 	ServiceType     string
@@ -43,15 +45,15 @@ func GenerateK8sManifests(cfg config.ProjectConfig) (map[string]FileDef, error) 
 
 	if f, ok := registry.SupportedFrontends[cfg.Frontend]; ok {
 		services = append(services, k8sService{
-			Name: "frontend", Image: f.Image, Port: f.InternalPort,
-			Replicas: 2, RunAsNonRoot: true, ServiceType: "LoadBalancer",
+			Name: "frontend", Image: "dev-box-frontend:latest", ImagePullPolicy: "IfNotPresent", Port: f.InternalPort,
+			Replicas: 2, RunAsNonRoot: true, HealthPath: "/", ServiceType: "LoadBalancer",
 		})
 	}
 
 	if b, ok := registry.SupportedBackends[cfg.Backend]; ok {
 		services = append(services, k8sService{
-			Name: "api", Image: b.Image, Port: b.InternalPort,
-			Replicas: 2, RunAsNonRoot: true, ServiceType: "ClusterIP",
+			Name: "api", Image: "dev-box-api:latest", ImagePullPolicy: "IfNotPresent", Port: b.InternalPort,
+			Replicas: 2, RunAsNonRoot: true, HealthPath: "/health", ServiceType: "ClusterIP",
 		})
 	}
 

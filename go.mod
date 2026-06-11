@@ -1,6 +1,6 @@
 module github.com/Sousuke-Naritomi/dev-box
 
-go 1.26.4
+go 1.25.0
 
 require (
 	github.com/charmbracelet/huh v1.0.0

@@ -7,17 +7,13 @@ on:
     branches: [main]
 
 jobs:
-  lint:
-    name: Lint
+  validate:
+    name: Validate Compose
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: "1.22"
-      - uses: golangci/golangci-lint-action@v4
-        with:
-          version: latest
+      - name: Validate docker compose configuration
+        run: docker compose config
 
   security-scan:
     name: Security Scan
@@ -25,7 +21,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.32.0
         with:
           scan-type: "fs"
           scan-ref: "."
@@ -35,7 +31,7 @@ jobs:
   build-and-test:
     name: Build and Test
     runs-on: ubuntu-latest
-    needs: [lint, security-scan]
+    needs: [validate, security-scan]
     steps:
       - uses: actions/checkout@v4
 
@@ -56,10 +52,24 @@ jobs:
           done
           docker compose ps
 
-      - name: Verify HTTP response
+{{- if .HasBackend }}
+      - name: Verify API response
         run: |
-          STATUS=$(curl -sf -o /dev/null -w "%%{http_code}" http://localhost:{{ .BackendPort }}/health || echo "000")
+          API_PORT=$(docker compose port api {{ .BackendPort }} | awk -F: '{print $NF}' | head -n 1)
+          STATUS=$(curl -sf -o /dev/null -w "%%{http_code}" "http://localhost:${API_PORT}/health" || echo "000")
           echo "Health check response: $STATUS"
+          test "$STATUS" = "200"
+{{- else if .HasFrontend }}
+      - name: Verify frontend response
+        run: |
+          FRONTEND_PORT=$(docker compose port frontend {{ .FrontendPort }} | awk -F: '{print $NF}' | head -n 1)
+          STATUS=$(curl -sf -o /dev/null -w "%%{http_code}" "http://localhost:${FRONTEND_PORT}/" || echo "000")
+          echo "Frontend response: $STATUS"
+          test "$STATUS" = "200"
+{{- else }}
+      - name: Verify compose project
+        run: docker compose ps
+{{- end }}
 
       - name: Tear down
         if: always()

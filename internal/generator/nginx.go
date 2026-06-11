@@ -9,16 +9,20 @@ import (
 )
 
 type nginxData struct {
-	BackendPort int
-	HasFrontend bool
+	BackendPort  int
+	FrontendPort int
+	HasBackend   bool
+	HasFrontend  bool
 }
 
 // GenerateNginxConf generates an Nginx configuration with rate limiting,
 // gzip compression, WebSocket support, and proper proxy headers.
-func GenerateNginxConf(cfg config.ProjectConfig, backendPort int) (string, error) {
+func GenerateNginxConf(cfg config.ProjectConfig, backendPort, frontendPort int) (string, error) {
 	data := nginxData{
-		BackendPort: backendPort,
-		HasFrontend: cfg.Frontend != "none" && cfg.Frontend != "",
+		BackendPort:  backendPort,
+		FrontendPort: frontendPort,
+		HasBackend:   cfg.Backend != "none" && cfg.Backend != "",
+		HasFrontend:  cfg.Frontend != "none" && cfg.Frontend != "",
 	}
 
 	tmpl, err := template.ParseFS(FS, "templates/nginx.conf.tmpl")
