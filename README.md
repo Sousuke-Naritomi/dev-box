@@ -2,19 +2,31 @@
 
 ![dev-box demo](https://raw.githubusercontent.com/Sousuke-Naritomi/dev-box/main/demo.gif)
 
-Go言語で書かれた、開発環境の構成ファイルを対話的に生成するCLIツールです。
+Go言語で書かれた、モダンな開発環境を対話的に生成・管理する強力なCLIツールです。
 
-Docker Compose、Kubernetes マニフェスト、Terraform 設定などを、ターミナル上で質問に答えるだけで生成できます。環境構築の手間を減らし、チーム内の構成を標準化することを目的としています。
+Docker Compose、Kubernetesマニフェスト、Terraform設定からソースコードのスキャフォールドまで、ターミナル上で直感的に選択するだけで瞬時に構築します。チーム内での環境構築の手間を省き、ベストプラクティスに沿ったセキュアな構成を標準化します。
 
-## 前提条件
+---
+
+## ✨ 主な特徴
+
+- 🎯 **対話型＆コマンドライン両対応**: `huh` を用いたリッチな対話型プロンプト。一部のフラグだけ（例: `--frontend=react`）を指定した場合、**不足している項目だけを動的に質問**する洗練されたUX。
+- 🛡 **型安全＆アーキテクチャの洗練**: `config.FrontendType` のような強い型付けと、DI（依存性の注入）を用いた疎結合な設計（Mock FS / Mock Generator）。
+- 🧩 **拡張性の高い Registry パターン**: 対応言語やフレームワークは `internal/registry` で一元管理。K8sジェネレーター等のハードコードを排除し、**新言語追加時に既存コードの修正が不要な完全な OCP（開放閉鎖の原則）** を実現。
+- 🔒 **セキュア・バイ・デフォルト**: `crypto/rand` を用いた強固なパスワード自動生成、`.env` の `0600` 権限設定、DBのRoot/Appパスワードの完全分離、K8sの `NetworkPolicy` によるデフォルト・デナイ設定。
+- 🐳 **Podman 対応**: Docker デーモンが見つからない場合、自動的に Podman を検知してシームレスにフォールバック（`dev-box status`, `dev-box logs` 等に対応）。
+
+---
+
+## 📦 前提条件
 
 | ツール | バージョン |
 |--------|-----------|
 | Go | 1.22 以上 |
-| Docker | 24.0 以上（Compose V2 プラグイン含む）|
-| Terraform | 1.0 以上（`deploy` コマンド使用時）|
+| Docker または Podman | 最新版（Compose V2 互換） |
+| Terraform | 1.0 以上（`deploy` コマンド使用時） |
 
-## インストール
+## 🚀 インストール
 
 ```bash
 go install github.com/Sousuke-Naritomi/dev-box@latest
@@ -28,94 +40,97 @@ cd dev-box
 make build
 ```
 
-## 使い方
+## 🛠 使い方
 
-### 開発環境の初期化
+### 1. 開発環境の初期化 (`init`)
 
 ```bash
+# 全て対話プロンプトで進める
 dev-box init
+
+# フロントエンドだけ指定し、残りをプロンプトで答える（最高のUX）
+dev-box init --frontend=react
+
+# CI/CDなどで完全に非対話で生成する
+dev-box init --frontend=react --backend=go --database=postgres --cache=redis --force
 ```
 
-対話形式で以下を選択し、`docker-compose.yml` と関連ファイルを生成します。
-
+生成された環境の起動と停止：
 ```bash
-dev-box start   # docker compose up -d
+dev-box start   # docker compose up -d (Podman自動フォールバック対応)
 dev-box stop    # docker compose down
+dev-box status  # コンテナのステータス確認
+dev-box logs    # ログのストリーミング表示
 ```
 
-### Kubernetes マニフェスト生成
+### 2. Kubernetes マニフェスト生成 (`k8s`)
 
 ```bash
-dev-box k8s
+dev-box k8s --backend=go
 ```
+`k8s-manifests/` ディレクトリに、Deployment, Service, PVC, NetworkPolicy などのマニフェストを出力します。イメージやポート番号は Registry から動的に解決されます。
 
-`k8s-manifests/` ディレクトリに Deployment、Service、PersistentVolumeClaim の YAML を生成します。
-
-### Terraform 設定生成
+### 3. Terraform 設定生成 (`deploy`)
 
 ```bash
 dev-box deploy
 ```
+AWS, GCP, Azure 向けの `main.tf` と `variables.tf` を対話的に生成します。
 
-`terraform/` ディレクトリに `main.tf` と `variables.tf` を生成します。
+---
 
-## 対応技術スタック
+## 📚 対応技術スタック
 
 | カテゴリ | 対応項目 |
 |---------|---------|
-| フロントエンド | React (Vite), Vue.js (Vite) |
-| バックエンド | Node.js, Python (Flask), Go, PHP, Java |
-| データベース | MySQL, PostgreSQL |
-| キャッシュ | Redis |
-| リバースプロキシ | Nginx（レートリミット、gzip、WebSocket対応） |
-| AWS ローカル開発 | LocalStack (S3, SQS, SNS, DynamoDB) |
-| 監視 | Prometheus, Grafana, Loki, Promtail |
-| CI/CD | GitHub Actions（Trivy スキャン、golangci-lint 含む） |
-| クラウド | AWS, GCP, Azure（Terraform） |
-| オーケストレーション | Kubernetes |
+| **フロントエンド** | React (Vite), Vue.js (Vite) |
+| **バックエンド** | Node.js (Express), Python (Flask), Go (net/http), PHP (Apache), Java (HttpServer) |
+| **データベース** | MySQL (8.0), PostgreSQL (16-alpine) |
+| **キャッシュ** | Redis (7-alpine) |
+| **プロキシ** | Nginx (1.27-alpine) — レートリミット、gzip、WebSocket対応 |
+| **AWS 開発** | LocalStack (3.5) — S3, SQS, SNS, DynamoDB |
+| **オブザーバビリティ**| Prometheus (v2.53.0), Grafana (11.1.0), Loki (3.1.0), Promtail (3.1.0) |
+| **CI/CD** | GitHub Actions（Trivy セキュリティスキャン、golangci-lint） |
+| **インフラ** | Kubernetes, AWS, GCP, Azure (Terraform) |
 
-## アーキテクチャ
+※ 本番環境の再現性を担保するため、Dockerイメージのバージョンは `latest` を避け、全て具体的なバージョンにピン留めされています。
 
-```
+---
+
+## 🏗 アーキテクチャ
+
+本プロジェクトはプロフェッショナルな Go 開発のベストプラクティスに基づき設計されています。
+
+```text
 dev-box/
-├── cmd/                  # CLI コマンドハンドラ（薄いレイヤー）
+├── cmd/                  # Cobra を用いた CLI エントリポイント
 ├── internal/
-│   ├── config/           # 設定構造体
-│   ├── generator/        # 各種ファイル生成ロジック
-│   ├── port/             # 空きポート探索
-│   └── security/         # パスワード生成
+│   ├── config/           # 強い型を用いた設定とバリデーション
+│   ├── fs/               # ファイルシステム抽象化（モックテスト用DI）
+│   ├── generator/        # Text/Template によるマニフェスト・コード生成
+│   ├── registry/         # フレームワークや言語定義を一元管理（Registryパターン）
+│   └── security/         # 暗号論的パスワード生成ロジック
 ├── main.go
-├── Makefile
-└── go.mod
+└── Makefile
 ```
 
-### 設計方針
+### ソフトウェア設計原則
+- **Open-Closed Principle (OCP)**: 新しい言語を足す際は `internal/registry` のマップに定義を追加するだけで、ジェネレーター（Docker/K8s等）の既存コードを変更する必要がありません。
+- **Dependency Injection (DI)**: `fs.FileSystem` や `generator.Generator` などのインターフェースを通じて依存を注入しており、I/Oを伴わない高速で堅牢な単体テストが可能です。
 
-- **責務の分離**: `cmd/` は入出力のみ。ビジネスロジックは `internal/` に集約
-- **テンプレートエンジン**: `text/template` による構造化された設定ファイル生成
-- **エラーハンドリング**: すべての I/O 操作でエラーを検査・報告
-- **セキュリティ**: `crypto/rand` による暗号学的に安全なパスワード生成、`.env` への機密情報分離
+---
 
-## テスト
+## 🧪 テストと品質
 
 ```bash
 make test
 ```
 
-テストカバレッジ:
-- `internal/security` — 82.1%
-- `internal/port` — 70.0%
-- `internal/generator` — 32.8%
+- **カバレッジの向上**: コアロジック、セキュリティジェネレーター、CLIコマンドのE2Eテストまで、広範なテストカバレッジを維持。
+- **Lint と静的解析**: `golangci-lint` および `go vet` による厳格なコード品質チェックをCIで自動化しています。
 
-## 開発
+---
 
-```bash
-make build    # バイナリをビルド
-make test     # テスト実行
-make lint     # go vet による静的解析
-make clean    # ビルド成果物を削除
-```
-
-## ライセンス
+## 📄 ライセンス
 
 [MIT License](LICENSE)
