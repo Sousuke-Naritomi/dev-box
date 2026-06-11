@@ -71,7 +71,7 @@ var initCmd = &cobra.Command{
 					Value(&localstack),
 
 				huh.NewConfirm().
-					Title("Include Monitoring? (Prometheus + Grafana)").
+					Title("Include Monitoring? (Prometheus + Grafana + Loki)").
 					Value(&monitoring),
 
 				huh.NewConfirm().
@@ -306,6 +306,8 @@ echo "Hello from dev-box PHP Environment!";
 	if monitoring {
 		promPort := getAvailablePort(9090)
 		grafPort := getAvailablePort(3001)
+		lokiPort := getAvailablePort(3100)
+
 		grafPassword := generatePassword(8)
 		envContent += fmt.Sprintf("GRAFANA_PASSWORD=%s\n", grafPassword)
 
@@ -315,6 +317,19 @@ echo "Hello from dev-box PHP Environment!";
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
     ports:
       - "%d:9090"
+  loki:
+    image: grafana/loki:latest
+    ports:
+      - "%d:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+  promtail:
+    image: grafana/promtail:latest
+    volumes:
+      - /var/log:/var/log
+      - ./promtail-config.yml:/etc/promtail/config.yml
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      - loki
   grafana:
     image: grafana/grafana:latest
     ports:
@@ -323,7 +338,8 @@ echo "Hello from dev-box PHP Environment!";
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
     depends_on:
       - prometheus
-`, promPort, grafPort)
+      - loki
+`, promPort, lokiPort, grafPort)
 
 		os.WriteFile("prometheus.yml", []byte(`global:
   scrape_interval: 15s
@@ -332,6 +348,26 @@ scrape_configs:
   - job_name: 'prometheus'
     static_configs:
       - targets: ['localhost:9090']
+`), 0644)
+
+		os.WriteFile("promtail-config.yml", []byte(`server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: system
+    static_configs:
+    - targets:
+        - localhost
+      labels:
+        job: varlogs
+        __path__: /var/log/*log
 `), 0644)
 	}
 
