@@ -2,14 +2,15 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 
 	"github.com/Sousuke-Naritomi/dev-box/internal/config"
+	"github.com/Sousuke-Naritomi/dev-box/internal/fs"
 	"github.com/Sousuke-Naritomi/dev-box/internal/generator"
+	"github.com/Sousuke-Naritomi/dev-box/internal/registry"
 )
 
 var initCmd = &cobra.Command{
@@ -100,14 +101,14 @@ func runInit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("resolving configuration: %w", err)
 	}
 
-	// Generate and write docker-compose.yml
+	filesToWrite := make(map[string]string)
+
+	// Generate docker-compose.yml
 	composeContent, err := generator.RenderCompose(data)
 	if err != nil {
 		return fmt.Errorf("rendering compose: %w", err)
 	}
-	if err := writeFile("docker-compose.yml", []byte(composeContent)); err != nil {
-		return err
-	}
+	filesToWrite["docker-compose.yml"] = composeContent
 
 	// Generate .env and .gitignore if needed
 	needsEnv := (cfg.Database != "none" && cfg.Database != "") || cfg.Monitoring || (cfg.Backend != "none" && cfg.Backend != "")
@@ -116,42 +117,46 @@ func runInit(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return fmt.Errorf("rendering env file: %w", err)
 		}
-		if err := writeFile(".env", []byte(envContent)); err != nil {
-			return err
-		}
-		if err := writeFile(".gitignore", []byte(generator.RenderGitignore())); err != nil {
-			return err
-		}
+		filesToWrite[".env"] = envContent
+		filesToWrite[".gitignore"] = generator.RenderGitignore()
+	}
+
+	backendInternalPort := 0
+	if b, ok := registry.SupportedBackends[cfg.Backend]; ok {
+		backendInternalPort = b.InternalPort
 	}
 
 	// Generate nginx config
 	if cfg.Nginx && (cfg.Frontend != "none" || cfg.Backend != "none") {
-		nginxConf, err := generator.GenerateNginxConf(cfg, cfg.BackendInternalPort())
+		nginxConf, err := generator.GenerateNginxConf(cfg, backendInternalPort)
 		if err != nil {
 			return fmt.Errorf("generating nginx conf: %w", err)
 		}
-		if err := writeFile(filepath.Join("nginx", "nginx.conf"), []byte(nginxConf)); err != nil {
-			return err
-		}
+		filesToWrite[filepath.Join("nginx", "nginx.conf")] = nginxConf
 	}
 
 	// Generate monitoring configs
 	if cfg.Monitoring {
-		if err := writeFile(filepath.Join("monitoring", "prometheus.yml"), []byte(generator.RenderPrometheusConfig())); err != nil {
+		promConfig, err := generator.RenderPrometheusConfig()
+		if err != nil {
 			return err
 		}
-		if err := writeFile(filepath.Join("monitoring", "promtail-config.yml"), []byte(generator.RenderPromtailConfig())); err != nil {
+		filesToWrite[filepath.Join("monitoring", "prometheus.yml")] = promConfig
+
+		promtailConfig, err := generator.RenderPromtailConfig()
+		if err != nil {
 			return err
 		}
+		filesToWrite[filepath.Join("monitoring", "promtail-config.yml")] = promtailConfig
 	}
 
 	// Generate CI/CD
 	if cfg.CICD {
-		cicdContent := generator.GenerateCICD(cfg.BackendInternalPort())
-		if err := writeFile(filepath.Join(".github", "workflows", "ci.yml"), []byte(cicdContent)); err != nil {
+		cicdContent, err := generator.GenerateCICD(backendInternalPort)
+		if err != nil {
 			return err
 		}
-		fmt.Println("✅ Generated .github/workflows/ci.yml")
+		filesToWrite[filepath.Join(".github", "workflows", "ci.yml")] = cicdContent
 	}
 
 	// Generate scaffold files
@@ -160,8 +165,35 @@ func runInit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("generating scaffold: %w", err)
 	}
 	for path, content := range scaffoldFiles {
-		if err := writeFile(path, []byte(content)); err != nil {
-			return err
+		filesToWrite[path] = content
+	}
+
+	fileSystem := fs.NewOSFileSystem()
+	var existingFiles []string
+	for path := range filesToWrite {
+		if fileSystem.Exists(path) {
+			existingFiles = append(existingFiles, path)
+		}
+	}
+
+	if len(existingFiles) > 0 {
+		var overwrite bool
+		err := huh.NewConfirm().
+			Title("既存のファイルが存在します。上書きしますか？ [y/N]").
+			Value(&overwrite).
+			Run()
+		if err != nil {
+			return fmt.Errorf("prompt cancelled: %w", err)
+		}
+		if !overwrite {
+			fmt.Println("❌ File generation aborted.")
+			return nil
+		}
+	}
+
+	for path, content := range filesToWrite {
+		if err := fileSystem.WriteFile(path, []byte(content), 0644); err != nil {
+			return fmt.Errorf("writing %s: %w", path, err)
 		}
 	}
 
@@ -169,19 +201,15 @@ func runInit(cmd *cobra.Command, args []string) error {
 	if needsEnv {
 		fmt.Println("🔒 A secure .env file was generated and added to .gitignore.")
 	}
+	if cfg.CICD {
+		fmt.Println("✅ Generated .github/workflows/ci.yml")
+	}
 	return nil
 }
 
-// writeFile creates the parent directory if needed and writes content to the file.
+// writeFile is a convenience function for commands that need to write files directly.
 func writeFile(path string, content []byte) error {
-	dir := filepath.Dir(path)
-	if dir != "." {
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			return fmt.Errorf("creating directory %s: %w", dir, err)
-		}
-	}
-	if err := os.WriteFile(path, content, 0644); err != nil {
-		return fmt.Errorf("writing file %s: %w", path, err)
-	}
-	return nil
+	fileSystem := fs.NewOSFileSystem()
+	return fileSystem.WriteFile(path, content, 0644)
 }
+

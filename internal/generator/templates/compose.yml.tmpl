@@ -1,0 +1,196 @@
+services:
+{{- if and (ne .Config.Database "none") (ne .Config.Database "") }}
+
+  db:
+    image: {{ if eq .Config.Database "mysql" }}mysql:{{ .VersionMySQL }}{{ else }}postgres:{{ .VersionPostgres }}{{ end }}
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "{{ .DBPort }}:{{ if eq .Config.Database "mysql" }}3306{{ else }}5432{{ end }}"
+    volumes:
+      - db-data:{{ if eq .Config.Database "mysql" }}/var/lib/mysql{{ else }}/var/lib/postgresql/data{{ end }}
+    healthcheck:
+      test: {{ if eq .Config.Database "mysql" }}["CMD", "mysqladmin", "ping", "-h", "localhost"]{{ else }}["CMD-SHELL", "pg_isready -U postgres"]{{ end }}
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - dev-network
+{{- end }}
+
+{{- if eq .Config.Cache "redis" }}
+
+  cache:
+    image: redis:{{ .VersionRedis }}
+    restart: unless-stopped
+    ports:
+      - "{{ .CachePort }}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - dev-network
+{{- end }}
+
+{{- if and (ne .Config.Frontend "none") (ne .Config.Frontend "") }}
+
+  frontend:
+    image: {{ .Frontend.Image }}
+    restart: unless-stopped
+    working_dir: /app
+    volumes:
+{{- range .Frontend.Volumes }}
+      - {{ . }}
+{{- end }}
+    command: {{ .Frontend.Command }}
+    ports:
+      - "{{ .FrontendPort }}:5173"
+    networks:
+      - dev-network
+{{- end }}
+
+{{- if and (ne .Config.Backend "none") (ne .Config.Backend "") }}
+
+  api:
+    image: {{ .Backend.Image }}
+    working_dir: {{ if eq .Config.Backend "php" }}/var/www/html{{ else }}/app{{ end }}
+{{- if .Backend.Volumes }}
+    volumes:
+{{- range .Backend.Volumes }}
+      - {{ . }}
+{{- end }}
+{{- end }}
+{{- if .Backend.Command }}
+    command: {{ .Backend.Command }}
+{{- end }}
+    restart: unless-stopped
+    ports:
+      - "{{ .BackendPort }}:{{ .Backend.InternalPort }}"
+    {{- if and (ne .Config.Database "none") (ne .Config.Database "") }}
+    depends_on:
+      db:
+        condition: service_healthy
+    {{- end }}
+    env_file:
+      - .env
+    networks:
+      - dev-network
+{{- end }}
+
+{{- if .Config.Nginx }}
+
+  nginx:
+    image: nginx:{{ .VersionNginx }}
+    restart: unless-stopped
+    ports:
+      - "{{ .NginxPort }}:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      {{- if and (ne .Config.Backend "none") (ne .Config.Backend "") }}
+      - api
+      {{- end }}
+      {{- if and (ne .Config.Frontend "none") (ne .Config.Frontend "") }}
+      - frontend
+      {{- end }}
+    networks:
+      - dev-network
+{{- end }}
+
+{{- if .Config.LocalStack }}
+
+  localstack:
+    image: localstack/localstack:{{ .VersionLocalStack }}
+    restart: unless-stopped
+    ports:
+      - "{{ .LocalStackPort }}:4566"
+    environment:
+      - SERVICES=s3,sqs,sns,dynamodb
+      - DEFAULT_REGION=ap-northeast-1
+    volumes:
+      - localstack-data:/var/lib/localstack
+    networks:
+      - dev-network
+{{- end }}
+
+{{- if .Config.Monitoring }}
+
+  prometheus:
+    image: prom/prometheus:{{ .VersionPrometheus }}
+    restart: unless-stopped
+    ports:
+      - "{{ .PrometheusPort }}:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - dev-network
+
+  grafana:
+    image: grafana/grafana:{{ .VersionGrafana }}
+    restart: unless-stopped
+    ports:
+      - "{{ .GrafanaPort }}:3000"
+    env_file:
+      - .env
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+    volumes:
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+      - loki
+    networks:
+      - dev-network
+
+  loki:
+    image: grafana/loki:{{ .VersionLoki }}
+    restart: unless-stopped
+    ports:
+      - "{{ .LokiPort }}:3100"
+    volumes:
+      - loki-data:/loki
+    networks:
+      - dev-network
+
+  promtail:
+    image: grafana/promtail:{{ .VersionPromtail }}
+    restart: unless-stopped
+    volumes:
+      - /var/log:/var/log:ro
+      - ./monitoring/promtail-config.yml:/etc/promtail/config.yml:ro
+    depends_on:
+      - loki
+    networks:
+      - dev-network
+{{- end }}
+
+volumes:
+{{- if .HasVolumes }}
+  db-data:
+{{- end }}
+{{- if and (ne .Config.Frontend "none") (ne .Config.Frontend "") }}
+  frontend-node-modules:
+{{- end }}
+{{- if eq .Config.Backend "node" }}
+  backend-node-modules:
+{{- end }}
+{{- if eq .Config.Backend "go" }}
+  go-mod-cache:
+{{- end }}
+{{- if .Config.LocalStack }}
+  localstack-data:
+{{- end }}
+{{- if .Config.Monitoring }}
+  prometheus-data:
+  grafana-data:
+  loki-data:
+{{- end }}
+
+networks:
+  dev-network:
+    driver: bridge

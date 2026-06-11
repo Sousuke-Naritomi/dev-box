@@ -10,11 +10,10 @@ import (
 )
 
 func TestRenderCompose_NoVersion(t *testing.T) {
-	data := &ComposeData{
-		Config: config.ProjectConfig{
-			Frontend: "none", Backend: "none", Database: "none", Cache: "none",
-		},
+	cfg := config.ProjectConfig{
+		Frontend: "none", Backend: "none", Database: "none", Cache: "none",
 	}
+	data, _ := ResolveComposeData(cfg)
 	result, err := RenderCompose(data)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -30,12 +29,10 @@ func TestRenderCompose_NoVersion(t *testing.T) {
 }
 
 func TestRenderCompose_MySQL(t *testing.T) {
-	data := &ComposeData{
-		Config:     config.ProjectConfig{Database: "mysql", Frontend: "none", Backend: "none", Cache: "none"},
-		DBPort:     3306,
-		DBPassword: "testpass",
-		HasVolumes: true,
-	}
+	cfg := config.ProjectConfig{Database: "mysql", Frontend: "none", Backend: "none", Cache: "none"}
+	data, _ := ResolveComposeData(cfg)
+	data.DBPort = 3306
+	data.DBPassword = "testpass"
 	result, err := RenderCompose(data)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -63,12 +60,10 @@ func TestRenderCompose_MySQL(t *testing.T) {
 }
 
 func TestRenderCompose_Postgres(t *testing.T) {
-	data := &ComposeData{
-		Config:     config.ProjectConfig{Database: "postgres", Frontend: "none", Backend: "none", Cache: "none"},
-		DBPort:     5432,
-		DBPassword: "testpass",
-		HasVolumes: true,
-	}
+	cfg := config.ProjectConfig{Database: "postgres", Frontend: "none", Backend: "none", Cache: "none"}
+	data, _ := ResolveComposeData(cfg)
+	data.DBPort = 5432
+	data.DBPassword = "testpass"
 	result, err := RenderCompose(data)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -86,15 +81,22 @@ func TestRenderCompose_Postgres(t *testing.T) {
 }
 
 func TestRenderCompose_FullStack(t *testing.T) {
-	data := &ComposeData{
-		Config: config.ProjectConfig{
-			Frontend: "react", Backend: "node", Database: "mysql", Cache: "redis",
-			Nginx: true, LocalStack: true, Monitoring: true,
-		},
-		DBPort: 3306, CachePort: 6379, FrontendPort: 5173, BackendPort: 3000,
-		NginxPort: 80, LocalStackPort: 4566, PrometheusPort: 9090, GrafanaPort: 3001, LokiPort: 3100,
-		BackendInternal: 3000, DBPassword: "test", GrafanaPassword: "graftest", HasVolumes: true,
+	cfg := config.ProjectConfig{
+		Frontend: "react", Backend: "node", Database: "mysql", Cache: "redis",
+		Nginx: true, LocalStack: true, Monitoring: true,
 	}
+	data, _ := ResolveComposeData(cfg)
+	data.DBPort = 3306
+	data.CachePort = 6379
+	data.FrontendPort = 5173
+	data.BackendPort = 3000
+	data.NginxPort = 80
+	data.LocalStackPort = 4566
+	data.PrometheusPort = 9090
+	data.GrafanaPort = 3001
+	data.LokiPort = 3100
+	data.DBPassword = "test"
+	data.GrafanaPassword = "graftest"
 	result, err := RenderCompose(data)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -113,14 +115,11 @@ func TestRenderCompose_FullStack(t *testing.T) {
 }
 
 func TestRenderCompose_BackendDependsOnDB(t *testing.T) {
-	data := &ComposeData{
-		Config:          config.ProjectConfig{Database: "postgres", Backend: "go", Frontend: "none", Cache: "none"},
-		DBPort:          5432,
-		BackendPort:     8080,
-		BackendInternal: 8080,
-		DBPassword:      "test",
-		HasVolumes:      true,
-	}
+	cfg := config.ProjectConfig{Database: "postgres", Backend: "go", Frontend: "none", Cache: "none"}
+	data, _ := ResolveComposeData(cfg)
+	data.DBPort = 5432
+	data.BackendPort = 8080
+	data.DBPassword = "test"
 	result, err := RenderCompose(data)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -131,11 +130,9 @@ func TestRenderCompose_BackendDependsOnDB(t *testing.T) {
 }
 
 func TestRenderCompose_JavaBackend(t *testing.T) {
-	data := &ComposeData{
-		Config:          config.ProjectConfig{Backend: "java", Frontend: "none", Database: "none", Cache: "none"},
-		BackendPort:     8080,
-		BackendInternal: 8080,
-	}
+	cfg := config.ProjectConfig{Backend: "java", Frontend: "none", Database: "none", Cache: "none"}
+	data, _ := ResolveComposeData(cfg)
+	data.BackendPort = 8080
 	result, err := RenderCompose(data)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -152,11 +149,9 @@ func TestRenderCompose_JavaBackend(t *testing.T) {
 }
 
 func TestRenderEnvFile_MySQL(t *testing.T) {
-	data := &ComposeData{
-		Config:     config.ProjectConfig{Database: "mysql", Backend: "node", Frontend: "none", Cache: "none"},
-		DBPassword: "secretpass",
-		BackendInternal: 3000,
-	}
+	cfg := config.ProjectConfig{Database: "mysql", Backend: "node", Frontend: "none", Cache: "none"}
+	data, _ := ResolveComposeData(cfg)
+	data.DBPassword = "secretpass"
 	result, err := RenderEnvFile(data)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
