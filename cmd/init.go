@@ -62,7 +62,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	}
 
 	if cfg.Frontend == "" || cfg.Backend == "" || cfg.Database == "" || cfg.Cache == "" {
-		isTerminal := term.IsTerminal(int(os.Stdout.Fd()))
+		isTerminal := term.IsTerminal(int(os.Stdin.Fd()))
 		if !isTerminal && !cfg.Force {
 			return fmt.Errorf("non-interactive environment detected. Please provide all required flags or use --force")
 		}
@@ -153,7 +153,7 @@ func runInitLogic(ctx context.Context, cfg config.ProjectConfig, fileSystem fs.F
 		if err != nil {
 			return fmt.Errorf("rendering env file: %w", err)
 		}
-		filesToWrite[".env"] = generator.FileDef{Content: envContent, Perm: 0644}
+		filesToWrite[".env"] = generator.FileDef{Content: envContent, Perm: 0600}
 
 		envExampleContent, err := generator.RenderEnvExampleFile(data)
 		if err != nil {
@@ -219,14 +219,14 @@ func runInitLogic(ctx context.Context, cfg config.ProjectConfig, fileSystem fs.F
 	}
 
 	if len(existingFiles) > 0 && !cfg.Force {
-		isTerminal := term.IsTerminal(int(os.Stdout.Fd()))
+		isTerminal := term.IsTerminal(int(os.Stdin.Fd()))
 		if !isTerminal {
 			return fmt.Errorf("non-interactive environment detected and existing files found; use --force to overwrite")
 		}
 
 		var overwrite bool
 		err := huh.NewConfirm().
-			Title("既存のファイルが存在します。上書きしますか？ [y/N]").
+			Title("Existing files found. Overwrite? [y/N]").
 			Value(&overwrite).
 			Run()
 		if err != nil {

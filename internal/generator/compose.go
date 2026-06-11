@@ -20,6 +20,7 @@ type ComposeData struct {
 	// Internal ports are read directly from registry Framework definitions.
 
 	DBPassword      string
+	DBRootPassword  string
 	GrafanaPassword string
 	HasVolumes      bool
 
@@ -77,6 +78,13 @@ func ResolveComposeData(cfg config.ProjectConfig) (*ComposeData, error) {
 		}
 	}
 
+	if cfg.Database == config.DatabaseMySQL {
+		data.DBRootPassword, err = security.GeneratePassword(24)
+		if err != nil {
+			return nil, fmt.Errorf("generating DB root password: %w", err)
+		}
+	}
+
 	if cfg.Monitoring {
 		data.GrafanaPassword, err = security.GeneratePassword(16)
 		if err != nil {
@@ -122,6 +130,9 @@ func RenderEnvExampleFile(data *ComposeData) (string, error) {
 	clone := *data
 	if clone.DBPassword != "" {
 		clone.DBPassword = "your_db_password"
+	}
+	if clone.DBRootPassword != "" {
+		clone.DBRootPassword = "your_db_root_password"
 	}
 	if clone.GrafanaPassword != "" {
 		clone.GrafanaPassword = "your_grafana_password"

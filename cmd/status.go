@@ -13,13 +13,14 @@ var statusCmd = &cobra.Command{
 	Short: "Show the status of the development environment",
 	Long:  `Runs docker compose ps to display the status of containers.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if _, err := exec.LookPath("docker"); err != nil {
-			return fmt.Errorf("Docker is not installed. Please install Docker: https://docs.docker.com/get-docker/")
+		dockerCmd, err := getDockerCmd()
+		if err != nil {
+			return err
 		}
 
 		fmt.Println("📊 Checking environment status...")
 
-		c := exec.Command("docker", "compose", "ps")
+		c := exec.Command(dockerCmd, "compose", "ps")
 		c.Stdout = os.Stdout
 		c.Stderr = os.Stderr
 

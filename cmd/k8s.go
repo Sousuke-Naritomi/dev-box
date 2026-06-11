@@ -40,7 +40,14 @@ func runK8s(cmd *cobra.Command, args []string) error {
 				huh.NewSelect[string]().Title("Frontend for K8s?").
 					Options(huh.NewOption("React", "react"), huh.NewOption("Vue", "vue"), huh.NewOption("None", "none")).Value(&frontend),
 				huh.NewSelect[string]().Title("Backend for K8s?").
-					Options(huh.NewOption("Yes", "yes"), huh.NewOption("None", "none")).Value(&backend),
+					Options(
+						huh.NewOption("Node.js (Express)", "node"),
+						huh.NewOption("Python (Flask)", "python"),
+						huh.NewOption("Go (net/http)", "go"),
+						huh.NewOption("PHP (Apache)", "php"),
+						huh.NewOption("Java (HttpServer)", "java"),
+						huh.NewOption("None", "none"),
+					).Value(&backend),
 				huh.NewSelect[string]().Title("Database for K8s?").
 					Options(huh.NewOption("MySQL", "mysql"), huh.NewOption("PostgreSQL", "postgres"), huh.NewOption("None", "none")).Value(&database),
 				huh.NewSelect[string]().Title("Cache for K8s?").

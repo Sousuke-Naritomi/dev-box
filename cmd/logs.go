@@ -13,8 +13,9 @@ var logsCmd = &cobra.Command{
 	Short: "View logs from the development environment",
 	Long:  `Runs docker compose logs -f to stream logs from containers.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if _, err := exec.LookPath("docker"); err != nil {
-			return fmt.Errorf("Docker is not installed. Please install Docker: https://docs.docker.com/get-docker/")
+		dockerCmd, err := getDockerCmd()
+		if err != nil {
+			return err
 		}
 
 		execArgs := []string{"compose", "logs", "-f"}
@@ -22,7 +23,7 @@ var logsCmd = &cobra.Command{
 			execArgs = append(execArgs, args...)
 		}
 
-		c := exec.Command("docker", execArgs...)
+		c := exec.Command(dockerCmd, execArgs...)
 		c.Stdout = os.Stdout
 		c.Stderr = os.Stderr
 

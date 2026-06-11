@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"text/template"
+
+	"github.com/Sousuke-Naritomi/dev-box/internal/config"
 )
 
 type k8sService struct {
@@ -40,7 +42,7 @@ func GenerateK8sManifests(frontend, backend, database, cache string) (map[string
 
 	if frontend == "react" || frontend == "vue" {
 		services = append(services, k8sService{
-			Name: "frontend", Image: "node:20-alpine", Port: 5173,
+			Name: "frontend", Image: "node:" + config.VersionNode, Port: 5173,
 			Replicas: 2, RunAsNonRoot: true, ServiceType: "LoadBalancer",
 		})
 	}
@@ -48,27 +50,27 @@ func GenerateK8sManifests(frontend, backend, database, cache string) (map[string
 	switch backend {
 	case "node":
 		services = append(services, k8sService{
-			Name: "api", Image: "node:20-alpine", Port: 3000,
+			Name: "api", Image: "node:" + config.VersionNode, Port: 3000,
 			Replicas: 2, RunAsNonRoot: true, ServiceType: "ClusterIP",
 		})
 	case "python":
 		services = append(services, k8sService{
-			Name: "api", Image: "python:3.12-slim", Port: 8000,
+			Name: "api", Image: "python:" + config.VersionPython, Port: 8000,
 			Replicas: 2, RunAsNonRoot: true, ServiceType: "ClusterIP",
 		})
 	case "go":
 		services = append(services, k8sService{
-			Name: "api", Image: "golang:1.22-alpine", Port: 8080,
+			Name: "api", Image: "golang:" + config.VersionGo, Port: 8080,
 			Replicas: 2, RunAsNonRoot: true, ServiceType: "ClusterIP",
 		})
 	case "php":
 		services = append(services, k8sService{
-			Name: "api", Image: "php:8.3-apache", Port: 80,
+			Name: "api", Image: "php:" + config.VersionPHP, Port: 80,
 			Replicas: 2, RunAsNonRoot: true, ServiceType: "ClusterIP",
 		})
 	case "java":
 		services = append(services, k8sService{
-			Name: "api", Image: "eclipse-temurin:17-jdk", Port: 8080,
+			Name: "api", Image: "eclipse-temurin:" + config.VersionJava, Port: 8080,
 			Replicas: 2, RunAsNonRoot: true, ServiceType: "ClusterIP",
 		})
 	}
@@ -76,7 +78,7 @@ func GenerateK8sManifests(frontend, backend, database, cache string) (map[string
 	switch database {
 	case "mysql":
 		services = append(services, k8sService{
-			Name: "db", Image: "mysql:8.0", Port: 3306,
+			Name: "db", Image: "mysql:" + config.VersionMySQL, Port: 3306,
 			Replicas: 1, RunAsNonRoot: false, HasDBSecret: true,
 			HealthCmd: []string{"mysqladmin", "ping", "-h", "localhost"},
 			VolumeMountPath: "/var/lib/mysql", EnvPasswordKey: "MYSQL_ROOT_PASSWORD",
@@ -84,7 +86,7 @@ func GenerateK8sManifests(frontend, backend, database, cache string) (map[string
 		})
 	case "postgres":
 		services = append(services, k8sService{
-			Name: "db", Image: "postgres:16-alpine", Port: 5432,
+			Name: "db", Image: "postgres:" + config.VersionPostgres, Port: 5432,
 			Replicas: 1, RunAsNonRoot: false, HasDBSecret: true,
 			HealthCmd: []string{"pg_isready", "-U", "postgres"},
 			VolumeMountPath: "/var/lib/postgresql/data", EnvPasswordKey: "POSTGRES_PASSWORD",
@@ -94,7 +96,7 @@ func GenerateK8sManifests(frontend, backend, database, cache string) (map[string
 
 	if cache == "redis" {
 		services = append(services, k8sService{
-			Name: "cache", Image: "redis:7-alpine", Port: 6379,
+			Name: "cache", Image: "redis:" + config.VersionRedis, Port: 6379,
 			Replicas: 1, RunAsNonRoot: true, HasDBSecret: false,
 			HealthCmd: []string{"redis-cli", "ping"}, ServiceType: "ClusterIP",
 		})

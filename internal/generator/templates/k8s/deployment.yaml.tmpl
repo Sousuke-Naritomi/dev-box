@@ -35,9 +35,14 @@ spec:
           env:
             - name: {{ .EnvPasswordKey }}
               valueFrom:
-               secretKeyRef:
-                 name: db-secret
-                 key: password
+                secretKeyRef:
+                  name: db-secret
+                  key: password
+          {{- end }}
+          {{- if .VolumeMountPath }}
+          volumeMounts:
+            - name: {{ .Name }}-storage
+              mountPath: {{ .VolumeMountPath }}
           {{- end }}
           {{- if .HealthCmd }}
           livenessProbe:
@@ -56,9 +61,6 @@ spec:
                 {{- end }}
             initialDelaySeconds: 5
             periodSeconds: 5
-          volumeMounts:
-            - name: {{ .Name }}-storage
-              mountPath: {{ .VolumeMountPath }}
           {{- else }}
           livenessProbe:
             httpGet:

@@ -35,5 +35,5 @@ func (fs *OSFileSystem) MkdirAll(path string, perm os.FileMode) error {
 
 func (fs *OSFileSystem) Exists(path string) bool {
 	_, err := os.Stat(path)
-	return !os.IsNotExist(err)
+	return err == nil
 }

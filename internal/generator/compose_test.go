@@ -159,12 +159,19 @@ func TestRenderEnvFile_MySQL(t *testing.T) {
 	cfg := config.ProjectConfig{Database: "mysql", Backend: "node", Frontend: "none", Cache: "none"}
 	data, _ := ResolveComposeData(cfg)
 	data.DBPassword = "secretpass"
+	data.DBRootPassword = "rootsecret"
 	result, err := RenderEnvFile(data)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(result, "MYSQL_ROOT_PASSWORD=secretpass") {
-		t.Error("expected env file to contain MYSQL_ROOT_PASSWORD")
+	if !strings.Contains(result, "MYSQL_ROOT_PASSWORD=rootsecret") {
+		t.Error("expected env file to contain MYSQL_ROOT_PASSWORD with root password")
+	}
+	if !strings.Contains(result, "MYSQL_PASSWORD=secretpass") {
+		t.Error("expected env file to contain MYSQL_PASSWORD with app password")
+	}
+	if result == "" || strings.Contains(result, "MYSQL_ROOT_PASSWORD=secretpass") {
+		t.Error("root password must differ from app password")
 	}
 }
 
