@@ -176,6 +176,18 @@ func RenderEnvFile(data *ComposeData) (string, error) {
 	return strings.TrimSpace(buf.String()) + "\n", nil
 }
 
+// RenderEnvExampleFile renders the .env.example file content with masked passwords.
+func RenderEnvExampleFile(data *ComposeData) (string, error) {
+	clone := *data
+	if clone.DBPassword != "" {
+		clone.DBPassword = "your_db_password"
+	}
+	if clone.GrafanaPassword != "" {
+		clone.GrafanaPassword = "your_grafana_password"
+	}
+	return RenderEnvFile(&clone)
+}
+
 // RenderGitignore returns .gitignore content appropriate for a dev-box project.
 func RenderGitignore() string {
 	return ".env\nnode_modules/\n__pycache__/\n*.pyc\n.vscode/\n.idea/\n*.class\ntarget/\nvendor/\ndist/\nbuild/\ntmp/\n"

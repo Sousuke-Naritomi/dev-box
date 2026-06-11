@@ -1,8 +1,12 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
+	"os"
 	"path/filepath"
+
+	"golang.org/x/term"
 
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
@@ -58,6 +62,11 @@ func runInit(cmd *cobra.Command, args []string) error {
 	}
 
 	if cfg.Frontend == "" || cfg.Backend == "" || cfg.Database == "" || cfg.Cache == "" {
+		isTerminal := term.IsTerminal(int(os.Stdout.Fd()))
+		if !isTerminal && !cfg.Force {
+			return fmt.Errorf("non-interactive environment detected. Please provide all required flags or use --force")
+		}
+
 		form := huh.NewForm(
 			huh.NewGroup(
 				huh.NewSelect[string]().
@@ -106,10 +115,10 @@ func runInit(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	return runInitLogic(cfg, app.FS)
+	return runInitLogic(cmd.Context(), cfg, app.FS)
 }
 
-func runInitLogic(cfg config.ProjectConfig, fileSystem fs.FileSystem) error {
+func runInitLogic(ctx context.Context, cfg config.ProjectConfig, fileSystem fs.FileSystem) error {
 	fmt.Printf("\n✨ Generating environment for: Frontend=%s, Backend=%s, Database=%s\n", cfg.Frontend, cfg.Backend, cfg.Database)
 
 	// Resolve ports and passwords
@@ -118,14 +127,14 @@ func runInitLogic(cfg config.ProjectConfig, fileSystem fs.FileSystem) error {
 		return fmt.Errorf("resolving configuration: %w", err)
 	}
 
-	filesToWrite := make(map[string]string)
+	filesToWrite := make(map[string]generator.FileDef)
 
 	// Generate docker-compose.yml
 	composeContent, err := generator.RenderCompose(data)
 	if err != nil {
 		return fmt.Errorf("rendering compose: %w", err)
 	}
-	filesToWrite["docker-compose.yml"] = composeContent
+	filesToWrite["docker-compose.yml"] = generator.FileDef{Content: composeContent, Perm: 0644}
 
 	// Generate .env and .gitignore if needed
 	needsEnv := (cfg.Database != "none" && cfg.Database != "") || cfg.Monitoring || (cfg.Backend != "none" && cfg.Backend != "")
@@ -134,8 +143,15 @@ func runInitLogic(cfg config.ProjectConfig, fileSystem fs.FileSystem) error {
 		if err != nil {
 			return fmt.Errorf("rendering env file: %w", err)
 		}
-		filesToWrite[".env"] = envContent
-		filesToWrite[".gitignore"] = generator.RenderGitignore()
+		filesToWrite[".env"] = generator.FileDef{Content: envContent, Perm: 0644}
+
+		envExampleContent, err := generator.RenderEnvExampleFile(data)
+		if err != nil {
+			return fmt.Errorf("rendering env.example file: %w", err)
+		}
+		filesToWrite[".env.example"] = generator.FileDef{Content: envExampleContent, Perm: 0644}
+
+		filesToWrite[".gitignore"] = generator.FileDef{Content: generator.RenderGitignore(), Perm: 0644}
 	}
 
 	backendInternalPort := 0
@@ -149,7 +165,7 @@ func runInitLogic(cfg config.ProjectConfig, fileSystem fs.FileSystem) error {
 		if err != nil {
 			return fmt.Errorf("generating nginx conf: %w", err)
 		}
-		filesToWrite[filepath.Join("nginx", "nginx.conf")] = nginxConf
+		filesToWrite[filepath.Join("nginx", "nginx.conf")] = generator.FileDef{Content: nginxConf, Perm: 0644}
 	}
 
 	// Generate monitoring configs
@@ -158,13 +174,13 @@ func runInitLogic(cfg config.ProjectConfig, fileSystem fs.FileSystem) error {
 		if err != nil {
 			return err
 		}
-		filesToWrite[filepath.Join("monitoring", "prometheus.yml")] = promConfig
+		filesToWrite[filepath.Join("monitoring", "prometheus.yml")] = generator.FileDef{Content: promConfig, Perm: 0644}
 
 		promtailConfig, err := generator.RenderPromtailConfig()
 		if err != nil {
 			return err
 		}
-		filesToWrite[filepath.Join("monitoring", "promtail-config.yml")] = promtailConfig
+		filesToWrite[filepath.Join("monitoring", "promtail-config.yml")] = generator.FileDef{Content: promtailConfig, Perm: 0644}
 	}
 
 	// Generate CI/CD
@@ -173,7 +189,7 @@ func runInitLogic(cfg config.ProjectConfig, fileSystem fs.FileSystem) error {
 		if err != nil {
 			return err
 		}
-		filesToWrite[filepath.Join(".github", "workflows", "ci.yml")] = cicdContent
+		filesToWrite[filepath.Join(".github", "workflows", "ci.yml")] = generator.FileDef{Content: cicdContent, Perm: 0644}
 	}
 
 	// Generate scaffold files
@@ -193,6 +209,11 @@ func runInitLogic(cfg config.ProjectConfig, fileSystem fs.FileSystem) error {
 	}
 
 	if len(existingFiles) > 0 && !cfg.Force {
+		isTerminal := term.IsTerminal(int(os.Stdout.Fd()))
+		if !isTerminal {
+			return fmt.Errorf("non-interactive environment detected and existing files found; use --force to overwrite")
+		}
+
 		var overwrite bool
 		err := huh.NewConfirm().
 			Title("既存のファイルが存在します。上書きしますか？ [y/N]").
@@ -207,8 +228,11 @@ func runInitLogic(cfg config.ProjectConfig, fileSystem fs.FileSystem) error {
 		}
 	}
 
-	for path, content := range filesToWrite {
-		if err := fileSystem.WriteFile(path, []byte(content), 0644); err != nil {
+	for path, fd := range filesToWrite {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if err := fileSystem.WriteFile(path, []byte(fd.Content), fd.Perm); err != nil {
 			return fmt.Errorf("writing %s: %w", path, err)
 		}
 	}

@@ -14,8 +14,8 @@ import (
 
 // GenerateScaffold generates boilerplate source code files for the selected
 // frontend and backend. Returns a map of relative filepath to file content.
-func GenerateScaffold(cfg config.ProjectConfig) (map[string]string, error) {
-	files := make(map[string]string)
+func GenerateScaffold(cfg config.ProjectConfig) (map[string]FileDef, error) {
+	files := make(map[string]FileDef)
 
 	templateData := struct {
 		VersionNode   string
@@ -50,7 +50,7 @@ func GenerateScaffold(cfg config.ProjectConfig) (map[string]string, error) {
 	return files, nil
 }
 
-func copyScaffoldFiles(templateDir string, destPrefix string, data any, out map[string]string) error {
+func copyScaffoldFiles(templateDir string, destPrefix string, data any, out map[string]FileDef) error {
 	return fs.WalkDir(FS, templateDir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -58,6 +58,12 @@ func copyScaffoldFiles(templateDir string, destPrefix string, data any, out map[
 		if d.IsDir() {
 			return nil
 		}
+
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+		mode := info.Mode()
 
 		contentBytes, err := fs.ReadFile(FS, path)
 		if err != nil {
@@ -83,9 +89,9 @@ func copyScaffoldFiles(templateDir string, destPrefix string, data any, out map[
 			if err := tmpl.Execute(&buf, data); err != nil {
 				return err
 			}
-			out[destPath] = buf.String()
+			out[destPath] = FileDef{Content: buf.String(), Perm: mode}
 		} else {
-			out[destPath] = string(contentBytes)
+			out[destPath] = FileDef{Content: string(contentBytes), Perm: mode}
 		}
 
 		return nil

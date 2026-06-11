@@ -16,7 +16,7 @@ func TestGenerateK8sManifests_Frontend(t *testing.T) {
 	}
 	checks := []string{"resources:", "limits:", "requests:", "livenessProbe:", "readinessProbe:", "runAsNonRoot: true"}
 	for _, check := range checks {
-		if !strings.Contains(content, check) {
+		if !strings.Contains(content.Content, check) {
 			t.Errorf("expected frontend manifest to contain %q", check)
 		}
 	}
@@ -51,11 +51,11 @@ func TestGenerateK8sManifests_DBWithPVC(t *testing.T) {
 				tt.image,
 			}
 			for _, check := range checks {
-				if !strings.Contains(content, check) {
+				if !strings.Contains(content.Content, check) {
 					t.Errorf("expected db manifest to contain %q", check)
 				}
 			}
-			if strings.Contains(content, "runAsNonRoot: true") {
+			if strings.Contains(content.Content, "runAsNonRoot: true") {
 				t.Error("DB should NOT have runAsNonRoot: true")
 			}
 		})
@@ -74,10 +74,10 @@ func TestGenerateK8sManifests_AllBackends(t *testing.T) {
 			if !ok {
 				t.Fatal("expected api.yaml in manifests")
 			}
-			if !strings.Contains(content, "resources:") {
+			if !strings.Contains(content.Content, "resources:") {
 				t.Error("expected manifest to contain resource limits")
 			}
-			if !strings.Contains(content, "livenessProbe:") {
+			if !strings.Contains(content.Content, "livenessProbe:") {
 				t.Error("expected manifest to contain livenessProbe")
 			}
 		})

@@ -23,6 +23,7 @@ func init() {
 }
 
 func runDeploy(cmd *cobra.Command, args []string) error {
+	ctx := cmd.Context()
 	provider, _ := cmd.Flags().GetString("provider")
 	if provider == "" {
 		form := huh.NewForm(
@@ -50,8 +51,11 @@ func runDeploy(cmd *cobra.Command, args []string) error {
 	}
 
 	outDir := "terraform"
-	for name, content := range files {
-		if err := app.FS.WriteFile(filepath.Join(outDir, name), []byte(content), 0644); err != nil {
+	for name, fd := range files {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if err := app.FS.WriteFile(filepath.Join(outDir, name), []byte(fd.Content), fd.Perm); err != nil {
 			return err
 		}
 	}

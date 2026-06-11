@@ -26,6 +26,7 @@ func init() {
 }
 
 func runK8s(cmd *cobra.Command, args []string) error {
+	ctx := cmd.Context()
 	frontend, _ := cmd.Flags().GetString("frontend")
 	backend, _ := cmd.Flags().GetString("backend")
 	database, _ := cmd.Flags().GetString("database")
@@ -58,8 +59,11 @@ func runK8s(cmd *cobra.Command, args []string) error {
 	}
 
 	outDir := "k8s-manifests"
-	for name, content := range manifests {
-		if err := app.FS.WriteFile(filepath.Join(outDir, name), []byte(content), 0644); err != nil {
+	for name, fd := range manifests {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if err := app.FS.WriteFile(filepath.Join(outDir, name), []byte(fd.Content), fd.Perm); err != nil {
 			return err
 		}
 	}

@@ -133,17 +133,17 @@ type k8sService struct {
 var k8sTmpl = template.Must(template.New("k8s").Parse(k8sDeploymentTmpl))
 
 // GenerateK8sManifests generates Kubernetes Deployment, Service, and PVC manifests
-// for the selected stack components. Returns a map of filename to YAML content.
-func GenerateK8sManifests(frontend, backend, database, cache string) (map[string]string, error) {
-	manifests := make(map[string]string)
+// for the selected stack components. Returns a map of filename to FileDef content.
+func GenerateK8sManifests(frontend, backend, database, cache string) (map[string]FileDef, error) {
+	manifests := make(map[string]FileDef)
 
-	manifests["namespace.yaml"] = `apiVersion: v1
+	manifests["namespace.yaml"] = FileDef{Content: `apiVersion: v1
 kind: Namespace
 metadata:
   name: dev-box-ns
-`
+`, Perm: 0644}
 
-	manifests["networkpolicy.yaml"] = `apiVersion: networking.k8s.io/v1
+	manifests["networkpolicy.yaml"] = FileDef{Content: `apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: default-deny-ingress
@@ -152,7 +152,7 @@ spec:
   podSelector: {}
   policyTypes:
     - Ingress
-`
+`, Perm: 0644}
 
 	var services []k8sService
 
@@ -223,7 +223,7 @@ spec:
 		if err := k8sTmpl.Execute(&buf, svc); err != nil {
 			return nil, fmt.Errorf("failed to render k8s manifest for %s: %w", svc.Name, err)
 		}
-		manifests[svc.Name+".yaml"] = buf.String()
+		manifests[svc.Name+".yaml"] = FileDef{Content: buf.String(), Perm: 0644}
 	}
 
 	return manifests, nil

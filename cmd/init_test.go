@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -20,7 +21,7 @@ func TestRunInitLogic_Success(t *testing.T) {
 		Force:    true,
 	}
 
-	err := runInitLogic(cfg, mockFS)
+	err := runInitLogic(context.Background(), cfg, mockFS)
 	if err != nil {
 		t.Fatalf("runInitLogic failed: %v", err)
 	}

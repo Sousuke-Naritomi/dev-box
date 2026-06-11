@@ -4,22 +4,22 @@ import "fmt"
 
 // GenerateTerraform generates Terraform configuration files for the specified
 // cloud provider. Returns a map of filename to file content.
-func GenerateTerraform(provider string) (map[string]string, error) {
-	files := make(map[string]string)
+func GenerateTerraform(provider string) (map[string]FileDef, error) {
+	files := make(map[string]FileDef)
 
 	switch provider {
 	case "aws":
-		files["main.tf"] = awsMainTF
-		files["variables.tf"] = awsVariablesTF
-		files["terraform.tfvars.example"] = `key_name = "your-ssh-key-name"`
+		files["main.tf"] = FileDef{Content: awsMainTF, Perm: 0644}
+		files["variables.tf"] = FileDef{Content: awsVariablesTF, Perm: 0644}
+		files["terraform.tfvars.example"] = FileDef{Content: `key_name = "your-ssh-key-name"`, Perm: 0644}
 	case "gcp":
-		files["main.tf"] = gcpMainTF
-		files["variables.tf"] = gcpVariablesTF
-		files["terraform.tfvars.example"] = `project_id = "your-gcp-project-id"`
+		files["main.tf"] = FileDef{Content: gcpMainTF, Perm: 0644}
+		files["variables.tf"] = FileDef{Content: gcpVariablesTF, Perm: 0644}
+		files["terraform.tfvars.example"] = FileDef{Content: `project_id = "your-gcp-project-id"`, Perm: 0644}
 	case "azure":
-		files["main.tf"] = azureMainTF
-		files["variables.tf"] = azureVariablesTF
-		files["terraform.tfvars.example"] = `# No required variables for Azure default setup`
+		files["main.tf"] = FileDef{Content: azureMainTF, Perm: 0644}
+		files["variables.tf"] = FileDef{Content: azureVariablesTF, Perm: 0644}
+		files["terraform.tfvars.example"] = FileDef{Content: `# No required variables for Azure default setup`, Perm: 0644}
 	default:
 		return nil, fmt.Errorf("unsupported provider: %q (supported: aws, gcp, azure)", provider)
 	}
