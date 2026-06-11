@@ -1,12 +1,12 @@
-# Build outputs
-dev-box
-dev-box.exe
-*.exe
-
-# IDE
+.env
+node_modules/
+__pycache__/
+*.pyc
 .vscode/
 .idea/
-
-# OS
-.DS_Store
-Thumbs.db
+*.class
+target/
+vendor/
+dist/
+build/
+tmp/
