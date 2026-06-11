@@ -22,6 +22,7 @@ var initCmd = &cobra.Command{
 		var backend string
 		var database string
 		var cache string
+		var localstack bool
 		var monitoring bool
 		var cicd bool
 
@@ -66,6 +67,10 @@ var initCmd = &cobra.Command{
 					Value(&cache),
 				
 				huh.NewConfirm().
+					Title("Include LocalStack? (AWS Local Emulator)").
+					Value(&localstack),
+
+				huh.NewConfirm().
 					Title("Include Monitoring? (Prometheus + Grafana)").
 					Value(&monitoring),
 
@@ -80,9 +85,9 @@ var initCmd = &cobra.Command{
 			log.Fatal(err)
 		}
 
-		fmt.Printf("\n✨ Generating environment for: Frontend=%s, Backend=%s, Database=%s, Cache=%s\n", frontend, backend, database, cache)
+		fmt.Printf("\n✨ Generating environment for: Frontend=%s, Backend=%s, Database=%s, Cache=%s, LocalStack=%v\n", frontend, backend, database, cache, localstack)
 		
-		generateDockerCompose(frontend, backend, database, cache, monitoring, cicd)
+		generateDockerCompose(frontend, backend, database, cache, monitoring, cicd, localstack)
 	},
 }
 
@@ -111,7 +116,7 @@ func generatePassword(length int) string {
 	return hex.EncodeToString(bytes)
 }
 
-func generateDockerCompose(frontend, backend, database, cache string, monitoring bool, cicd bool) {
+func generateDockerCompose(frontend, backend, database, cache string, monitoring bool, cicd bool, localstack bool) {
 	content := "version: '3.8'\nservices:\n"
 	envContent := ""
 	
@@ -150,6 +155,20 @@ func generateDockerCompose(frontend, backend, database, cache string, monitoring
     image: redis:alpine
     ports:
       - "%d:6379"
+`, port)
+	}
+
+	if localstack {
+		port := getAvailablePort(4566)
+		content += fmt.Sprintf(`  localstack:
+    image: localstack/localstack:latest
+    ports:
+      - "%d:4566"
+    environment:
+      - SERVICES=s3,dynamodb,sqs,sns
+      - DEFAULT_REGION=ap-northeast-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
 `, port)
 	}
 
@@ -324,7 +343,6 @@ scrape_configs:
 
 	if envContent != "" {
 		os.WriteFile(".env", []byte(envContent), 0644)
-		// Check if .gitignore exists, append or create
 		f, err := os.OpenFile(".gitignore", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err == nil {
 			f.WriteString("\n# Ignore env files containing secrets\n.env\n")
@@ -370,6 +388,6 @@ jobs:
 
 	fmt.Println("✅ Successfully generated local environment configuration!")
 	if envContent != "" {
-		fmt.Println("🔒 Security Note: A secure .env file was generated and added to .gitignore. Do not commit it to version control!")
+		fmt.Println("🔒 Security Note: A secure .env file was generated and added to .gitignore.")
 	}
 }
