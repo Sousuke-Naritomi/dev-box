@@ -14,7 +14,7 @@ func TestRegistryTemplatesExist(t *testing.T) {
 	}
 
 	for id, frontend := range registry.SupportedFrontends {
-		t.Run("Frontend_"+id, func(t *testing.T) {
+		t.Run("Frontend_"+string(id), func(t *testing.T) {
 			_, err := fs.Stat(FS, frontend.TemplateDir)
 			if err != nil {
 				t.Errorf("Template directory %q for frontend %q does not exist in embed.FS: %v", frontend.TemplateDir, id, err)
@@ -23,7 +23,7 @@ func TestRegistryTemplatesExist(t *testing.T) {
 	}
 
 	for id, backend := range registry.SupportedBackends {
-		t.Run("Backend_"+id, func(t *testing.T) {
+		t.Run("Backend_"+string(id), func(t *testing.T) {
 			_, err := fs.Stat(FS, backend.TemplateDir)
 			if err != nil {
 				t.Errorf("Template directory %q for backend %q does not exist in embed.FS: %v", backend.TemplateDir, id, err)

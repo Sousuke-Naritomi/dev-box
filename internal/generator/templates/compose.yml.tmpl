@@ -7,7 +7,7 @@ services:
     env_file:
       - .env
     ports:
-      - "{{ .DBPort }}:{{ if eq .Config.Database "mysql" }}3306{{ else }}5432{{ end }}"
+      - "0:{{ if eq .Config.Database "mysql" }}3306{{ else }}5432{{ end }}"
     volumes:
       - db-data:{{ if eq .Config.Database "mysql" }}/var/lib/mysql{{ else }}/var/lib/postgresql/data{{ end }}
     healthcheck:
@@ -26,7 +26,7 @@ services:
     image: redis:{{ .VersionRedis }}
     restart: unless-stopped
     ports:
-      - "{{ .CachePort }}:6379"
+      - "0:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -48,7 +48,7 @@ services:
 {{- end }}
     command: {{ .Frontend.Command }}
     ports:
-      - "{{ .FrontendPort }}:5173"
+      - "0:5173"
     networks:
       - dev-network
 {{- end }}
@@ -69,7 +69,7 @@ services:
 {{- end }}
     restart: unless-stopped
     ports:
-      - "{{ .BackendPort }}:{{ .Backend.InternalPort }}"
+      - "0:{{ .Backend.InternalPort }}"
     {{- if and (ne .Config.Database "none") (ne .Config.Database "") }}
     depends_on:
       db:
@@ -87,7 +87,7 @@ services:
     image: nginx:{{ .VersionNginx }}
     restart: unless-stopped
     ports:
-      - "{{ .NginxPort }}:80"
+      - "0:80"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
@@ -107,7 +107,7 @@ services:
     image: localstack/localstack:{{ .VersionLocalStack }}
     restart: unless-stopped
     ports:
-      - "{{ .LocalStackPort }}:4566"
+      - "0:4566"
     environment:
       - SERVICES=s3,sqs,sns,dynamodb
       - DEFAULT_REGION=ap-northeast-1
@@ -123,7 +123,7 @@ services:
     image: prom/prometheus:{{ .VersionPrometheus }}
     restart: unless-stopped
     ports:
-      - "{{ .PrometheusPort }}:9090"
+      - "0:9090"
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
@@ -134,7 +134,7 @@ services:
     image: grafana/grafana:{{ .VersionGrafana }}
     restart: unless-stopped
     ports:
-      - "{{ .GrafanaPort }}:3000"
+      - "0:3000"
     env_file:
       - .env
     environment:
@@ -151,7 +151,7 @@ services:
     image: grafana/loki:{{ .VersionLoki }}
     restart: unless-stopped
     ports:
-      - "{{ .LokiPort }}:3100"
+      - "0:3100"
     volumes:
       - loki-data:/loki
     networks:

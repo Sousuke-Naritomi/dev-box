@@ -12,8 +12,8 @@ type BackendFramework struct {
 	TemplateDir    string
 }
 
-var SupportedBackends = map[string]BackendFramework{
-	"node": {
+var SupportedBackends = map[config.BackendType]BackendFramework{
+	config.BackendNode: {
 		ID:           "node",
 		Name:         "Node.js (Express)",
 		Image:        "node:" + config.VersionNode,
@@ -22,7 +22,7 @@ var SupportedBackends = map[string]BackendFramework{
 		Volumes:      []string{"./backend:/app", "backend-node-modules:/app/node_modules"},
 		TemplateDir:  "templates/scaffold/backend/node",
 	},
-	"python": {
+	config.BackendPython: {
 		ID:           "python",
 		Name:         "Python (Flask)",
 		Image:        "python:" + config.VersionPython,
@@ -31,7 +31,7 @@ var SupportedBackends = map[string]BackendFramework{
 		Volumes:      []string{"./backend:/app"},
 		TemplateDir:  "templates/scaffold/backend/python",
 	},
-	"go": {
+	config.BackendGo: {
 		ID:           "go",
 		Name:         "Go (net/http)",
 		Image:        "golang:" + config.VersionGo,
@@ -40,7 +40,7 @@ var SupportedBackends = map[string]BackendFramework{
 		Volumes:      []string{"./backend:/app", "go-mod-cache:/go/pkg/mod"},
 		TemplateDir:  "templates/scaffold/backend/go",
 	},
-	"php": {
+	config.BackendPHP: {
 		ID:           "php",
 		Name:         "PHP (Apache)",
 		Image:        "php:" + config.VersionPHP,
@@ -49,7 +49,7 @@ var SupportedBackends = map[string]BackendFramework{
 		Volumes:      []string{"./backend:/var/www/html"},
 		TemplateDir:  "templates/scaffold/backend/php",
 	},
-	"java": {
+	config.BackendJava: {
 		ID:           "java",
 		Name:         "Java (HttpServer)",
 		Image:        "eclipse-temurin:" + config.VersionJava,

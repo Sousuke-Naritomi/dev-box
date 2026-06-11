@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"path/filepath"
 	"strings"
@@ -8,22 +9,68 @@ import (
 
 	"github.com/Sousuke-Naritomi/dev-box/internal/config"
 	"github.com/Sousuke-Naritomi/dev-box/internal/fs"
+	"github.com/Sousuke-Naritomi/dev-box/internal/generator"
 )
 
-func TestRunInitLogic_Success(t *testing.T) {
+// MockGenerator is a mock implementation of generator.Generator for testing.
+type MockGenerator struct {
+	ScaffoldFunc func(cfg config.ProjectConfig) (map[string]generator.FileDef, error)
+	TfFunc       func(provider string) (map[string]generator.FileDef, error)
+	K8sFunc      func(frontend, backend, database, cache string) (map[string]generator.FileDef, error)
+}
+
+func (m *MockGenerator) GenerateScaffold(cfg config.ProjectConfig) (map[string]generator.FileDef, error) {
+	if m.ScaffoldFunc != nil {
+		return m.ScaffoldFunc(cfg)
+	}
+	return map[string]generator.FileDef{}, nil
+}
+
+func (m *MockGenerator) GenerateTerraform(provider string) (map[string]generator.FileDef, error) {
+	if m.TfFunc != nil {
+		return m.TfFunc(provider)
+	}
+	return map[string]generator.FileDef{}, nil
+}
+
+func (m *MockGenerator) GenerateK8sManifests(frontend, backend, database, cache string) (map[string]generator.FileDef, error) {
+	if m.K8sFunc != nil {
+		return m.K8sFunc(frontend, backend, database, cache)
+	}
+	return map[string]generator.FileDef{}, nil
+}
+
+func TestInitCmd_E2E(t *testing.T) {
 	mockFS := fs.NewMockFileSystem()
-	cfg := config.ProjectConfig{
-		Frontend: "react",
-		Backend:  "go",
-		Database: "postgres",
-		Cache:    "redis",
-		Nginx:    true,
-		Force:    true,
+	mockGen := &MockGenerator{
+		ScaffoldFunc: func(cfg config.ProjectConfig) (map[string]generator.FileDef, error) {
+			return map[string]generator.FileDef{
+				"frontend/package.json": {Content: "{}", Perm: 0644},
+				"backend/main.go":       {Content: "package main", Perm: 0644},
+			}, nil
+		},
 	}
 
-	err := runInitLogic(context.Background(), cfg, mockFS)
+	app.FS = mockFS
+	app.Gen = mockGen
+
+	outBuf := new(bytes.Buffer)
+	errBuf := new(bytes.Buffer)
+	rootCmd.SetOut(outBuf)
+	rootCmd.SetErr(errBuf)
+	rootCmd.SetArgs([]string{
+		"init",
+		"--frontend=react",
+		"--backend=go",
+		"--database=postgres",
+		"--cache=redis",
+		"--nginx=true",
+		"--force=true",
+	})
+
+	err := rootCmd.ExecuteContext(context.Background())
 	if err != nil {
-		t.Fatalf("runInitLogic failed: %v", err)
+		t.Fatalf("cmd.ExecuteContext failed: %v\nstderr: %s", err, errBuf.String())
 	}
 
 	expectedFiles := []string{
@@ -43,14 +90,19 @@ func TestRunInitLogic_Success(t *testing.T) {
 }
 
 func TestInitCmdValidation_InvalidFrontend(t *testing.T) {
-	cmd := initCmd
-	// Set valid backend but invalid frontend
-	cmd.Flags().Set("frontend", "invalid-frontend")
-	cmd.Flags().Set("backend", "go")
-	cmd.Flags().Set("database", "mysql")
-	cmd.Flags().Set("cache", "redis")
+	outBuf := new(bytes.Buffer)
+	errBuf := new(bytes.Buffer)
+	rootCmd.SetOut(outBuf)
+	rootCmd.SetErr(errBuf)
+	rootCmd.SetArgs([]string{
+		"init",
+		"--frontend=invalid-frontend",
+		"--backend=go",
+		"--database=mysql",
+		"--cache=redis",
+	})
 
-	err := runInit(cmd, []string{})
+	err := rootCmd.ExecuteContext(context.Background())
 	if err == nil {
 		t.Fatal("expected validation error for invalid frontend")
 	}
@@ -60,13 +112,19 @@ func TestInitCmdValidation_InvalidFrontend(t *testing.T) {
 }
 
 func TestInitCmdValidation_InvalidBackend(t *testing.T) {
-	cmd := initCmd
-	cmd.Flags().Set("frontend", "react")
-	cmd.Flags().Set("backend", "invalid-backend")
-	cmd.Flags().Set("database", "mysql")
-	cmd.Flags().Set("cache", "redis")
+	outBuf := new(bytes.Buffer)
+	errBuf := new(bytes.Buffer)
+	rootCmd.SetOut(outBuf)
+	rootCmd.SetErr(errBuf)
+	rootCmd.SetArgs([]string{
+		"init",
+		"--frontend=react",
+		"--backend=invalid-backend",
+		"--database=mysql",
+		"--cache=redis",
+	})
 
-	err := runInit(cmd, []string{})
+	err := rootCmd.ExecuteContext(context.Background())
 	if err == nil {
 		t.Fatal("expected validation error for invalid backend")
 	}

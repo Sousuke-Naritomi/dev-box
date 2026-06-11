@@ -11,8 +11,8 @@ type FrontendFramework struct {
 	TemplateDir string
 }
 
-var SupportedFrontends = map[string]FrontendFramework{
-	"react": {
+var SupportedFrontends = map[config.FrontendType]FrontendFramework{
+	config.FrontendReact: {
 		ID:          "react",
 		Name:        "React (Vite)",
 		Image:       "node:" + config.VersionNode,
@@ -20,7 +20,7 @@ var SupportedFrontends = map[string]FrontendFramework{
 		Volumes:     []string{"./frontend:/app", "frontend-node-modules:/app/node_modules"},
 		TemplateDir: "templates/scaffold/frontend/react",
 	},
-	"vue": {
+	config.FrontendVue: {
 		ID:          "vue",
 		Name:        "Vue.js (Vite)",
 		Image:       "node:" + config.VersionNode,

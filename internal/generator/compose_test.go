@@ -31,38 +31,57 @@ func TestRenderCompose_NoVersion(t *testing.T) {
 func TestRenderCompose_MySQL(t *testing.T) {
 	cfg := config.ProjectConfig{Database: "mysql", Frontend: "none", Backend: "none", Cache: "none"}
 	data, _ := ResolveComposeData(cfg)
-	data.DBPort = 3306
 	data.DBPassword = "testpass"
 	result, err := RenderCompose(data)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	checks := []string{
-		"image: mysql:8.0",
-		"restart: unless-stopped",
-		"healthcheck:",
-		"mysqladmin",
-		"db-data:/var/lib/mysql",
-		"dev-network",
-		"volumes:",
-		"networks:",
-	}
-	for _, check := range checks {
-		if !strings.Contains(result, check) {
-			t.Errorf("expected compose to contain %q", check)
-		}
+
+	var parsed struct {
+		Services map[string]struct {
+			Image       string   `yaml:"image"`
+			Restart     string   `yaml:"restart"`
+			Ports       []string `yaml:"ports"`
+			Healthcheck struct {
+				Test []string `yaml:"test"`
+			} `yaml:"healthcheck"`
+		} `yaml:"services"`
+		Volumes map[string]interface{} `yaml:"volumes"`
 	}
 
-	var parsed map[string]interface{}
 	if err := yaml.Unmarshal([]byte(result), &parsed); err != nil {
 		t.Fatalf("generated compose is not valid YAML: %v\n%s", err, result)
+	}
+
+	db, ok := parsed.Services["db"]
+	if !ok {
+		t.Fatal("expected 'db' service in compose")
+	}
+
+	if !strings.HasPrefix(db.Image, "mysql:") {
+		t.Errorf("expected 'mysql' image, got %s", db.Image)
+	}
+
+	if db.Restart != "unless-stopped" {
+		t.Errorf("expected restart 'unless-stopped', got %s", db.Restart)
+	}
+
+	if len(db.Ports) == 0 || db.Ports[0] != "0:3306" {
+		t.Errorf("expected port mapping '0:3306', got %v", db.Ports)
+	}
+
+	if len(db.Healthcheck.Test) == 0 || db.Healthcheck.Test[1] != "mysqladmin" {
+		t.Errorf("expected healthcheck with mysqladmin, got %v", db.Healthcheck.Test)
+	}
+
+	if _, ok := parsed.Volumes["db-data"]; !ok {
+		t.Errorf("expected volume 'db-data'")
 	}
 }
 
 func TestRenderCompose_Postgres(t *testing.T) {
 	cfg := config.ProjectConfig{Database: "postgres", Frontend: "none", Backend: "none", Cache: "none"}
 	data, _ := ResolveComposeData(cfg)
-	data.DBPort = 5432
 	data.DBPassword = "testpass"
 	result, err := RenderCompose(data)
 	if err != nil {
@@ -86,15 +105,6 @@ func TestRenderCompose_FullStack(t *testing.T) {
 		Nginx: true, LocalStack: true, Monitoring: true,
 	}
 	data, _ := ResolveComposeData(cfg)
-	data.DBPort = 3306
-	data.CachePort = 6379
-	data.FrontendPort = 5173
-	data.BackendPort = 3000
-	data.NginxPort = 80
-	data.LocalStackPort = 4566
-	data.PrometheusPort = 9090
-	data.GrafanaPort = 3001
-	data.LokiPort = 3100
 	data.DBPassword = "test"
 	data.GrafanaPassword = "graftest"
 	result, err := RenderCompose(data)
@@ -117,8 +127,6 @@ func TestRenderCompose_FullStack(t *testing.T) {
 func TestRenderCompose_BackendDependsOnDB(t *testing.T) {
 	cfg := config.ProjectConfig{Database: "postgres", Backend: "go", Frontend: "none", Cache: "none"}
 	data, _ := ResolveComposeData(cfg)
-	data.DBPort = 5432
-	data.BackendPort = 8080
 	data.DBPassword = "test"
 	result, err := RenderCompose(data)
 	if err != nil {
@@ -132,7 +140,6 @@ func TestRenderCompose_BackendDependsOnDB(t *testing.T) {
 func TestRenderCompose_JavaBackend(t *testing.T) {
 	cfg := config.ProjectConfig{Backend: "java", Frontend: "none", Database: "none", Cache: "none"}
 	data, _ := ResolveComposeData(cfg)
-	data.BackendPort = 8080
 	result, err := RenderCompose(data)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -158,9 +165,6 @@ func TestRenderEnvFile_MySQL(t *testing.T) {
 	}
 	if !strings.Contains(result, "MYSQL_ROOT_PASSWORD=secretpass") {
 		t.Error("expected env file to contain MYSQL_ROOT_PASSWORD")
-	}
-	if !strings.Contains(result, "BACKEND_PORT=3000") {
-		t.Error("expected env file to contain BACKEND_PORT")
 	}
 }
 

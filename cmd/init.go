@@ -40,24 +40,24 @@ func init() {
 func runInit(cmd *cobra.Command, args []string) error {
 	cfg := config.ProjectConfig{}
 
-	cfg.Frontend, _ = cmd.Flags().GetString("frontend")
-	cfg.Backend, _ = cmd.Flags().GetString("backend")
-	cfg.Database, _ = cmd.Flags().GetString("database")
-	cfg.Cache, _ = cmd.Flags().GetString("cache")
+	frontendStr, _ := cmd.Flags().GetString("frontend")
+	backendStr, _ := cmd.Flags().GetString("backend")
+	databaseStr, _ := cmd.Flags().GetString("database")
+	cacheStr, _ := cmd.Flags().GetString("cache")
+
+	cfg.Frontend = config.FrontendType(frontendStr)
+	cfg.Backend = config.BackendType(backendStr)
+	cfg.Database = config.DatabaseType(databaseStr)
+	cfg.Cache = config.CacheType(cacheStr)
 	cfg.Nginx, _ = cmd.Flags().GetBool("nginx")
 	cfg.LocalStack, _ = cmd.Flags().GetBool("localstack")
 	cfg.Monitoring, _ = cmd.Flags().GetBool("monitoring")
 	cfg.CICD, _ = cmd.Flags().GetBool("cicd")
 	cfg.Force, _ = cmd.Flags().GetBool("force")
 
-	if cfg.Frontend != "" && cfg.Frontend != "none" {
-		if _, ok := registry.SupportedFrontends[cfg.Frontend]; !ok {
-			return fmt.Errorf("unsupported frontend: %s", cfg.Frontend)
-		}
-	}
-	if cfg.Backend != "" && cfg.Backend != "none" {
-		if _, ok := registry.SupportedBackends[cfg.Backend]; !ok {
-			return fmt.Errorf("unsupported backend: %s", cfg.Backend)
+	if frontendStr != "" || backendStr != "" || databaseStr != "" || cacheStr != "" {
+		if err := cfg.Validate(); err != nil {
+			return err
 		}
 	}
 
@@ -67,6 +67,8 @@ func runInit(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("non-interactive environment detected. Please provide all required flags or use --force")
 		}
 
+		var frontendStr, backendStr, databaseStr, cacheStr string
+
 		form := huh.NewForm(
 			huh.NewGroup(
 				huh.NewSelect[string]().
@@ -75,7 +77,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 						huh.NewOption("React (Vite)", "react"),
 						huh.NewOption("Vue.js (Vite)", "vue"),
 						huh.NewOption("None", "none"),
-					).Value(&cfg.Frontend),
+					).Value(&frontendStr),
 
 				huh.NewSelect[string]().
 					Title("Choose your Backend Language").
@@ -86,7 +88,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 						huh.NewOption("PHP (Apache)", "php"),
 						huh.NewOption("Java (HttpServer)", "java"),
 						huh.NewOption("None", "none"),
-					).Value(&cfg.Backend),
+					).Value(&backendStr),
 
 				huh.NewSelect[string]().
 					Title("Choose your Database").
@@ -94,14 +96,14 @@ func runInit(cmd *cobra.Command, args []string) error {
 						huh.NewOption("MySQL", "mysql"),
 						huh.NewOption("PostgreSQL", "postgres"),
 						huh.NewOption("None", "none"),
-					).Value(&cfg.Database),
+					).Value(&databaseStr),
 
 				huh.NewSelect[string]().
 					Title("Choose your Cache").
 					Options(
 						huh.NewOption("Redis", "redis"),
 						huh.NewOption("None", "none"),
-					).Value(&cfg.Cache),
+					).Value(&cacheStr),
 
 				huh.NewConfirm().Title("Include Nginx Reverse Proxy?").Value(&cfg.Nginx),
 				huh.NewConfirm().Title("Include LocalStack? (AWS Local Emulator)").Value(&cfg.LocalStack),
@@ -113,12 +115,20 @@ func runInit(cmd *cobra.Command, args []string) error {
 		if err := form.Run(); err != nil {
 			return fmt.Errorf("form cancelled: %w", err)
 		}
+
+		cfg.Frontend = config.FrontendType(frontendStr)
+		cfg.Backend = config.BackendType(backendStr)
+		cfg.Database = config.DatabaseType(databaseStr)
+		cfg.Cache = config.CacheType(cacheStr)
+		if err := cfg.Validate(); err != nil {
+			return err
+		}
 	}
 
-	return runInitLogic(cmd.Context(), cfg, app.FS)
+	return runInitLogic(cmd.Context(), cfg, app.FS, app.Gen)
 }
 
-func runInitLogic(ctx context.Context, cfg config.ProjectConfig, fileSystem fs.FileSystem) error {
+func runInitLogic(ctx context.Context, cfg config.ProjectConfig, fileSystem fs.FileSystem, gen generator.Generator) error {
 	fmt.Printf("\n✨ Generating environment for: Frontend=%s, Backend=%s, Database=%s\n", cfg.Frontend, cfg.Backend, cfg.Database)
 
 	// Resolve ports and passwords
@@ -193,7 +203,7 @@ func runInitLogic(ctx context.Context, cfg config.ProjectConfig, fileSystem fs.F
 	}
 
 	// Generate scaffold files
-	scaffoldFiles, err := generator.GenerateScaffold(cfg)
+	scaffoldFiles, err := gen.GenerateScaffold(cfg)
 	if err != nil {
 		return fmt.Errorf("generating scaffold: %w", err)
 	}

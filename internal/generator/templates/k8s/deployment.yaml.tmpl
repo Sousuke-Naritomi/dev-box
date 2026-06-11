@@ -1,0 +1,109 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Name }}-deployment
+  namespace: dev-box-ns
+  labels:
+    app: {{ .Name }}
+spec:
+  replicas: {{ .Replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Name }}
+    spec:
+      {{- if .RunAsNonRoot }}
+      securityContext:
+        runAsNonRoot: true
+      {{- end }}
+      containers:
+        - name: {{ .Name }}
+          image: {{ .Image }}
+          ports:
+            - containerPort: {{ .Port }}
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          {{- if .HasDBSecret }}
+          env:
+            - name: {{ .EnvPasswordKey }}
+              valueFrom:
+               secretKeyRef:
+                 name: db-secret
+                 key: password
+          {{- end }}
+          {{- if .HealthCmd }}
+          livenessProbe:
+            exec:
+              command:
+                {{- range .HealthCmd }}
+                - "{{ . }}"
+                {{- end }}
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command:
+                {{- range .HealthCmd }}
+                - "{{ . }}"
+                {{- end }}
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          volumeMounts:
+            - name: {{ .Name }}-storage
+              mountPath: {{ .VolumeMountPath }}
+          {{- else }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Port }}
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Port }}
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          {{- end }}
+      {{- if .VolumeMountPath }}
+      volumes:
+        - name: {{ .Name }}-storage
+          persistentVolumeClaim:
+            claimName: {{ .Name }}-pvc
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Name }}-service
+  namespace: dev-box-ns
+spec:
+  selector:
+    app: {{ .Name }}
+  ports:
+    - protocol: TCP
+      port: {{ .Port }}
+      targetPort: {{ .Port }}
+  type: {{ .ServiceType }}
+{{- if .VolumeMountPath }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Name }}-pvc
+  namespace: dev-box-ns
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+{{- end }}

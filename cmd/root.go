@@ -7,15 +7,18 @@ import (
 	"os/signal"
 
 	"github.com/Sousuke-Naritomi/dev-box/internal/fs"
+	"github.com/Sousuke-Naritomi/dev-box/internal/generator"
 	"github.com/spf13/cobra"
 )
 
 type App struct {
-	FS fs.FileSystem
+	FS  fs.FileSystem
+	Gen generator.Generator
 }
 
 var app = &App{
-	FS: fs.NewOSFileSystem(),
+	FS:  fs.NewOSFileSystem(),
+	Gen: &generator.DefaultGenerator{},
 }
 
 var rootCmd = &cobra.Command{

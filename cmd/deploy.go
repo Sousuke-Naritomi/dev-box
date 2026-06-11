@@ -47,7 +47,7 @@ func runDeploy(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("\n☁️  Generating Terraform configuration for %s...\n", provider)
 
-	if err := runDeployLogic(ctx, provider, app.FS); err != nil {
+	if err := runDeployLogic(ctx, provider, app.FS, app.Gen); err != nil {
 		return err
 	}
 
@@ -56,8 +56,8 @@ func runDeploy(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func runDeployLogic(ctx context.Context, provider string, fileSystem fs.FileSystem) error {
-	files, err := generator.GenerateTerraform(provider)
+func runDeployLogic(ctx context.Context, provider string, fileSystem fs.FileSystem, gen generator.Generator) error {
+	files, err := gen.GenerateTerraform(provider)
 	if err != nil {
 		return fmt.Errorf("generating terraform: %w", err)
 	}

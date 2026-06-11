@@ -7,7 +7,6 @@ import (
 	"text/template"
 
 	"github.com/Sousuke-Naritomi/dev-box/internal/config"
-	"github.com/Sousuke-Naritomi/dev-box/internal/port"
 	"github.com/Sousuke-Naritomi/dev-box/internal/registry"
 	"github.com/Sousuke-Naritomi/dev-box/internal/security"
 )
@@ -17,15 +16,9 @@ type ComposeData struct {
 	Config          config.ProjectConfig
 	Frontend        *registry.FrontendFramework
 	Backend         *registry.BackendFramework
-	DBPort          int
-	CachePort       int
-	FrontendPort    int
-	BackendPort     int
-	LocalStackPort  int
-	NginxPort       int
-	PrometheusPort  int
-	GrafanaPort     int
-	LokiPort        int
+	// Ports are now assigned dynamically by Docker Compose (using "0:<internal_port>")
+	// Internal ports are read directly from registry Framework definitions.
+
 	DBPassword      string
 	GrafanaPassword string
 	HasVolumes      bool
@@ -75,68 +68,16 @@ func ResolveComposeData(cfg config.ProjectConfig) (*ComposeData, error) {
 		data.Backend = &b
 	}
 
-	nextPort := 13000
-	allocate := func() (int, error) {
-		p, err := port.FindAvailable(nextPort)
-		if err != nil {
-			return 0, err
-		}
-		nextPort = p + 1
-		return p, nil
-	}
-
 	var err error
 
-	if cfg.Database == "mysql" || cfg.Database == "postgres" {
-		if data.DBPort, err = allocate(); err != nil {
-			return nil, fmt.Errorf("allocating DB port: %w", err)
-		}
+	if cfg.Database == config.DatabaseMySQL || cfg.Database == config.DatabasePostgres {
 		data.DBPassword, err = security.GeneratePassword(20)
 		if err != nil {
 			return nil, fmt.Errorf("generating DB password: %w", err)
 		}
 	}
 
-	if cfg.Cache == "redis" {
-		if data.CachePort, err = allocate(); err != nil {
-			return nil, fmt.Errorf("allocating cache port: %w", err)
-		}
-	}
-
-	if data.Frontend != nil {
-		if data.FrontendPort, err = allocate(); err != nil {
-			return nil, fmt.Errorf("allocating frontend port: %w", err)
-		}
-	}
-
-	if data.Backend != nil {
-		if data.BackendPort, err = allocate(); err != nil {
-			return nil, fmt.Errorf("allocating backend port: %w", err)
-		}
-	}
-
-	if cfg.LocalStack {
-		if data.LocalStackPort, err = allocate(); err != nil {
-			return nil, fmt.Errorf("allocating LocalStack port: %w", err)
-		}
-	}
-
-	if cfg.Nginx {
-		if data.NginxPort, err = allocate(); err != nil {
-			return nil, fmt.Errorf("allocating Nginx port: %w", err)
-		}
-	}
-
 	if cfg.Monitoring {
-		if data.PrometheusPort, err = allocate(); err != nil {
-			return nil, fmt.Errorf("allocating Prometheus port: %w", err)
-		}
-		if data.GrafanaPort, err = allocate(); err != nil {
-			return nil, fmt.Errorf("allocating Grafana port: %w", err)
-		}
-		if data.LokiPort, err = allocate(); err != nil {
-			return nil, fmt.Errorf("allocating Loki port: %w", err)
-		}
 		data.GrafanaPassword, err = security.GeneratePassword(16)
 		if err != nil {
 			return nil, fmt.Errorf("generating Grafana password: %w", err)

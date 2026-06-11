@@ -55,7 +55,7 @@ func runK8s(cmd *cobra.Command, args []string) error {
 
 	fmt.Println("\n✨ Generating Kubernetes manifests...")
 
-	if err := runK8sLogic(ctx, frontend, backend, database, cache, app.FS); err != nil {
+	if err := runK8sLogic(ctx, frontend, backend, database, cache, app.FS, app.Gen); err != nil {
 		return err
 	}
 
@@ -64,8 +64,8 @@ func runK8s(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func runK8sLogic(ctx context.Context, frontend, backend, database, cache string, fileSystem fs.FileSystem) error {
-	manifests, err := generator.GenerateK8sManifests(frontend, backend, database, cache)
+func runK8sLogic(ctx context.Context, frontend, backend, database, cache string, fileSystem fs.FileSystem, gen generator.Generator) error {
+	manifests, err := gen.GenerateK8sManifests(frontend, backend, database, cache)
 	if err != nil {
 		return fmt.Errorf("generating k8s manifests: %w", err)
 	}

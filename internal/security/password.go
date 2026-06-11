@@ -13,6 +13,9 @@ const (
 	lowercase = "abcdefghijklmnopqrstuvwxyz"
 	digits    = "0123456789"
 	symbols   = "!@#$%^&*()-_=+[]{}|;:,.<>?"
+
+	// MaxPasswordLength defines the maximum allowed password length to prevent DoS.
+	MaxPasswordLength = 1024
 )
 
 // GeneratePassword generates a cryptographically secure random password of
@@ -25,6 +28,9 @@ const (
 func GeneratePassword(length int) (string, error) {
 	if length < 4 {
 		return "", fmt.Errorf("password length must be at least 4, got %d", length)
+	}
+	if length > MaxPasswordLength {
+		return "", fmt.Errorf("password length must not exceed %d, got %d", MaxPasswordLength, length)
 	}
 
 	allChars := uppercase + lowercase + digits + symbols
