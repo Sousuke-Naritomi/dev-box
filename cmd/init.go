@@ -24,6 +24,7 @@ var initCmd = &cobra.Command{
 		var cache string
 		var localstack bool
 		var monitoring bool
+		var nginxProxy bool
 		var cicd bool
 
 		form := huh.NewForm(
@@ -67,6 +68,10 @@ var initCmd = &cobra.Command{
 					Value(&cache),
 				
 				huh.NewConfirm().
+					Title("Include Nginx Reverse Proxy? (API Gateway)").
+					Value(&nginxProxy),
+
+				huh.NewConfirm().
 					Title("Include LocalStack? (AWS Local Emulator)").
 					Value(&localstack),
 
@@ -85,9 +90,9 @@ var initCmd = &cobra.Command{
 			log.Fatal(err)
 		}
 
-		fmt.Printf("\n✨ Generating environment for: Frontend=%s, Backend=%s, Database=%s, Cache=%s, LocalStack=%v\n", frontend, backend, database, cache, localstack)
+		fmt.Printf("\n✨ Generating environment for: Frontend=%s, Backend=%s, Database=%s, Cache=%s, Proxy=%v, LocalStack=%v\n", frontend, backend, database, cache, nginxProxy, localstack)
 		
-		generateDockerCompose(frontend, backend, database, cache, monitoring, cicd, localstack)
+		generateDockerCompose(frontend, backend, database, cache, monitoring, cicd, localstack, nginxProxy)
 	},
 }
 
@@ -116,7 +121,7 @@ func generatePassword(length int) string {
 	return hex.EncodeToString(bytes)
 }
 
-func generateDockerCompose(frontend, backend, database, cache string, monitoring bool, cicd bool, localstack bool) {
+func generateDockerCompose(frontend, backend, database, cache string, monitoring bool, cicd bool, localstack bool, nginxProxy bool) {
 	content := "version: '3.8'\nservices:\n"
 	envContent := ""
 	
@@ -172,6 +177,8 @@ func generateDockerCompose(frontend, backend, database, cache string, monitoring
 `, port)
 	}
 
+	backendInternalPort := ""
+
 	if frontend == "react" || frontend == "vue" {
 		port := getAvailablePort(5173) // Vite default port
 		content += fmt.Sprintf(`  frontend:
@@ -202,6 +209,7 @@ func generateDockerCompose(frontend, backend, database, cache string, monitoring
 	}
 
 	if backend == "node" {
+		backendInternalPort = "3000"
 		port := getAvailablePort(3000)
 		content += fmt.Sprintf(`  api:
     image: node:20-alpine
@@ -226,6 +234,7 @@ app.listen(3000, () => console.log('Server running on port 3000'));
 `), 0644)
 
 	} else if backend == "python" {
+		backendInternalPort = "8000"
 		port := getAvailablePort(8000)
 		content += fmt.Sprintf(`  api:
     image: python:3.11-slim
@@ -247,6 +256,7 @@ def read_root():
 `), 0644)
 
 	} else if backend == "go" {
+		backendInternalPort = "8080"
 		port := getAvailablePort(8080)
 		content += fmt.Sprintf(`  api:
     image: golang:1.22-alpine
@@ -275,6 +285,7 @@ func main() {
 `), 0644)
 
 	} else if backend == "php" {
+		backendInternalPort = "80"
 		port := getAvailablePort(80)
 		content += fmt.Sprintf(`  api:
     image: php:8.2-apache
@@ -290,6 +301,7 @@ echo "Hello from dev-box PHP Environment!";
 `), 0644)
 
 	} else if backend == "java" {
+		backendInternalPort = "8080"
 		port := getAvailablePort(8080)
 		content += fmt.Sprintf(`  api:
     image: maven:3.9-eclipse-temurin-17
@@ -301,6 +313,52 @@ echo "Hello from dev-box PHP Environment!";
       - "%d:8080"
 `, port)
 		os.MkdirAll("backend", 0755)
+	}
+
+	if nginxProxy && (frontend != "none" || backend != "none") {
+		nginxPort := getAvailablePort(80)
+		content += fmt.Sprintf(`  nginx:
+    image: nginx:alpine
+    ports:
+      - "%d:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+`, nginxPort)
+		if frontend != "none" {
+			content += "      - frontend\n"
+		}
+		if backend != "none" {
+			content += "      - api\n"
+		}
+
+		nginxConf := `events {
+    worker_connections 1024;
+}
+http {
+    server {
+        listen 80;
+`
+		if frontend != "none" {
+			nginxConf += `        location / {
+            proxy_pass http://frontend:5173;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+        }
+`
+		}
+		if backend != "none" {
+			nginxConf += fmt.Sprintf(`        location /api/ {
+            proxy_pass http://api:%s/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+        }
+`, backendInternalPort)
+		}
+		nginxConf += `    }
+}
+`
+		os.WriteFile("nginx.conf", []byte(nginxConf), 0644)
 	}
 
 	if monitoring {
