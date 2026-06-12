@@ -11,11 +11,11 @@ func GenerateTerraform(provider string) (map[string]FileDef, error) {
 
 	switch provider {
 	case "aws":
-		tfvarsContent = `key_name = "your-ssh-key-name"`
+		tfvarsContent = "key_name = \"your-ssh-key-name\"\nallowed_ssh_cidrs = [\"203.0.113.10/32\"]\nenable_public_web = false\nallowed_web_cidrs = []"
 	case "gcp":
-		tfvarsContent = `project_id = "your-gcp-project-id"`
+		tfvarsContent = "project_id = \"your-gcp-project-id\"\nallowed_ssh_cidrs = [\"203.0.113.10/32\"]\nenable_public_web = false\nallowed_web_cidrs = []"
 	case "azure":
-		tfvarsContent = `# No required variables for Azure default setup`
+		tfvarsContent = "allowed_ssh_cidrs = [\"203.0.113.10/32\"]\nenable_public_web = false\nallowed_web_cidrs = []"
 	default:
 		return nil, fmt.Errorf("unsupported provider: %q (supported: aws, gcp, azure)", provider)
 	}

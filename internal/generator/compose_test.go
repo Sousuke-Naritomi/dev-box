@@ -66,8 +66,8 @@ func TestRenderCompose_MySQL(t *testing.T) {
 		t.Errorf("expected restart 'unless-stopped', got %s", db.Restart)
 	}
 
-	if len(db.Ports) == 0 || db.Ports[0] != "0:3306" {
-		t.Errorf("expected port mapping '0:3306', got %v", db.Ports)
+	if len(db.Ports) == 0 || db.Ports[0] != "127.0.0.1:0:3306" {
+		t.Errorf("expected localhost-only port mapping, got %v", db.Ports)
 	}
 
 	if len(db.Healthcheck.Test) == 0 || db.Healthcheck.Test[1] != "mysqladmin" {
@@ -164,10 +164,10 @@ func TestRenderEnvFile_MySQL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(result, "MYSQL_ROOT_PASSWORD=rootsecret") {
+	if !strings.Contains(result, "MYSQL_ROOT_PASSWORD='rootsecret'") {
 		t.Error("expected env file to contain MYSQL_ROOT_PASSWORD with root password")
 	}
-	if !strings.Contains(result, "MYSQL_PASSWORD=secretpass") {
+	if !strings.Contains(result, "MYSQL_PASSWORD='secretpass'") {
 		t.Error("expected env file to contain MYSQL_PASSWORD with app password")
 	}
 	if result == "" || strings.Contains(result, "MYSQL_ROOT_PASSWORD=secretpass") {

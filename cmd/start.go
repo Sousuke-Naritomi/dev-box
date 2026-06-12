@@ -13,14 +13,14 @@ var startCmd = &cobra.Command{
 	Short: "Start the development environment",
 	Long:  `Runs docker compose up -d to spin up the containers in the background.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		dockerCmd, err := getDockerCmd()
+		dockerCmd, err := getDockerCmd(cmd.Context())
 		if err != nil {
 			return err
 		}
 
 		fmt.Println("🚀 Starting the development environment...")
 
-		c := exec.Command(dockerCmd, "compose", "up", "-d")
+		c := exec.CommandContext(cmd.Context(), dockerCmd, "compose", "up", "-d")
 		c.Stdout = os.Stdout
 		c.Stderr = os.Stderr
 
@@ -32,7 +32,7 @@ var startCmd = &cobra.Command{
 		fmt.Println("📡 Assigned Ports:")
 
 		// Run `docker compose ps` to show the dynamically allocated ports
-		psCmd := exec.Command(dockerCmd, "compose", "ps")
+		psCmd := exec.CommandContext(cmd.Context(), dockerCmd, "compose", "ps")
 		psCmd.Stdout = os.Stdout
 		psCmd.Stderr = os.Stderr
 		_ = psCmd.Run()

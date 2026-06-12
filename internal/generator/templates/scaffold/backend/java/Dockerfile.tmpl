@@ -1,5 +1,11 @@
-FROM eclipse-temurin:{{ .VersionJava }}
+FROM eclipse-temurin:{{ .VersionJava }} AS build
 WORKDIR /app
 COPY Main.java .
 RUN javac Main.java
+
+FROM eclipse-temurin:17-jre
+RUN groupadd --gid 10001 app && useradd --uid 10001 --gid app --no-create-home app
+WORKDIR /app
+COPY --from=build --chown=app:app /app/Main.class .
+USER 10001:10001
 CMD ["java", "Main"]

@@ -13,14 +13,14 @@ var stopCmd = &cobra.Command{
 	Short: "Stop the development environment",
 	Long:  `Runs docker compose down to stop and remove the containers.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		dockerCmd, err := getDockerCmd()
+		dockerCmd, err := getDockerCmd(cmd.Context())
 		if err != nil {
 			return err
 		}
 
 		fmt.Println("🛑 Stopping the development environment...")
 
-		c := exec.Command(dockerCmd, "compose", "down")
+		c := exec.CommandContext(cmd.Context(), dockerCmd, "compose", "down")
 		c.Stdout = os.Stdout
 		c.Stderr = os.Stderr
 

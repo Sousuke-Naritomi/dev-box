@@ -73,5 +73,13 @@ func (c *ProjectConfig) Validate() error {
 		return fmt.Errorf("unsupported cache: %q", c.Cache)
 	}
 
+	if c.Frontend == FrontendNone &&
+		c.Backend == BackendNone &&
+		c.Database == DatabaseNone &&
+		c.Cache == CacheNone &&
+		!c.LocalStack && !c.Monitoring {
+		return fmt.Errorf("at least one service must be selected")
+	}
+
 	return nil
 }

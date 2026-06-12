@@ -17,11 +17,21 @@ spec:
     spec:
       securityContext:
         runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: frontend
-          image: node:20-alpine
+          image: dev-box-frontend:latest
+          imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 5173
+            - containerPort: 8080
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 101
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           resources:
             requests:
               cpu: "100m"
@@ -31,14 +41,14 @@ spec:
               memory: "256Mi"
           livenessProbe:
             httpGet:
-              path: /health
-              port: 5173
+              path: /
+              port: 8080
             initialDelaySeconds: 15
             periodSeconds: 10
           readinessProbe:
             httpGet:
-              path: /health
-              port: 5173
+              path: /
+              port: 8080
             initialDelaySeconds: 5
             periodSeconds: 5
 ---
@@ -52,6 +62,6 @@ spec:
     app: frontend
   ports:
     - protocol: TCP
-      port: 5173
-      targetPort: 5173
+      port: 8080
+      targetPort: 8080
   type: LoadBalancer

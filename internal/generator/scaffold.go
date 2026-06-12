@@ -23,12 +23,14 @@ func GenerateScaffold(cfg config.ProjectConfig) (map[string]FileDef, error) {
 		VersionGo     string
 		VersionPHP    string
 		VersionJava   string
+		VersionNginx  string
 	}{
 		VersionNode:   config.VersionNode,
 		VersionPython: config.VersionPython,
 		VersionGo:     config.VersionGo,
 		VersionPHP:    config.VersionPHP,
 		VersionJava:   config.VersionJava,
+		VersionNginx:  config.VersionNginx,
 	}
 
 	if frontend, ok := registry.SupportedFrontends[cfg.Frontend]; ok {
@@ -59,11 +61,7 @@ func copyScaffoldFiles(templateDir string, destPrefix string, data any, out map[
 			return nil
 		}
 
-		info, err := d.Info()
-		if err != nil {
-			return err
-		}
-		mode := info.Mode()
+		const mode = 0644
 
 		contentBytes, err := fs.ReadFile(FS, path)
 		if err != nil {

@@ -1,4 +1,4 @@
-name: CI/CD Pipeline
+name: CI
 
 on:
   push:
@@ -6,26 +6,131 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
-  lint:
-    name: Lint
+  go:
+    name: Go quality
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+          cache: true
+      - name: Verify formatting
+        run: test -z "$(gofmt -l .)"
+      - name: Verify module files
+        run: |
+          go mod tidy
+          git diff --exit-code -- go.mod go.sum
+      - name: Vet
+        run: go vet ./...
+      - name: Test with race detector
+        run: go test -race -coverprofile=coverage.out ./...
       - uses: golangci/golangci-lint-action@v6
         with:
-          version: latest
+          version: v2.1.6
 
-  test:
-    name: Test
+  generated-compose:
+    name: Validate generated Compose
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        stack:
+          - "--frontend=react --backend=go --database=postgres --cache=redis --nginx --monitoring"
+          - "--frontend=none --backend=node --database=mysql --cache=none"
+          - "--frontend=vue --backend=none --database=none --cache=none"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Generate stack
+        run: go run . init ${{ matrix.stack }} --force --output-dir "$RUNNER_TEMP/generated"
+      - name: Validate Compose
+        working-directory: ${{ runner.temp }}/generated
+        run: docker compose config --quiet
+
+  generated-kubernetes:
+    name: Validate generated Kubernetes
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - run: go mod tidy
-      - run: go test -v -cover ./...
+      - name: Generate manifests
+        run: go run . k8s --frontend=react --backend=go --database=postgres --cache=redis --force --output-dir "$RUNNER_TEMP/k8s"
+      - name: Validate schemas
+        run: docker run --rm -v "$RUNNER_TEMP/k8s:/manifests:ro" ghcr.io/yannh/kubeconform:v0.7.0 -strict -summary /manifests
+
+  generated-images:
+    name: Build and run generated images as non-root
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Generate application images
+        run: go run . init --frontend=react --backend=go --database=none --cache=none --force --output-dir "$RUNNER_TEMP/generated"
+      - name: Build images
+        run: |
+          docker build -t dev-box-ci-frontend "$RUNNER_TEMP/generated/frontend"
+          docker build -t dev-box-ci-api "$RUNNER_TEMP/generated/backend"
+      - name: Verify configured users
+        run: |
+          test "$(docker image inspect dev-box-ci-frontend --format '{{.Config.User}}')" = "101:101"
+          test "$(docker image inspect dev-box-ci-api --format '{{.Config.User}}')" = "10001:10001"
+      - name: Run and verify health endpoints
+        run: |
+          docker run -d --name dev-box-ci-frontend -p 127.0.0.1::8080 dev-box-ci-frontend
+          docker run -d --name dev-box-ci-api -p 127.0.0.1::8080 dev-box-ci-api
+          FRONTEND_PORT=$(docker port dev-box-ci-frontend 8080/tcp | awk -F: '{print $NF}')
+          API_PORT=$(docker port dev-box-ci-api 8080/tcp | awk -F: '{print $NF}')
+          for i in $(seq 1 30); do
+            curl -fsS "http://127.0.0.1:${FRONTEND_PORT}/" >/dev/null && \
+              curl -fsS "http://127.0.0.1:${API_PORT}/health" >/dev/null && exit 0
+            sleep 2
+          done
+          docker logs dev-box-ci-frontend
+          docker logs dev-box-ci-api
+          exit 1
+      - name: Clean up containers
+        if: always()
+        run: docker rm -f dev-box-ci-frontend dev-box-ci-api || true
+
+  generated-terraform:
+    name: Validate generated Terraform (${{ matrix.provider }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        provider: [aws, gcp, azure]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: hashicorp/setup-terraform@v3
+      - name: Generate Terraform
+        run: go run . deploy --provider=${{ matrix.provider }} --force --output-dir "$RUNNER_TEMP/terraform"
+      - name: Format check
+        working-directory: ${{ runner.temp }}/terraform
+        run: terraform fmt -check -recursive
+      - name: Initialize
+        working-directory: ${{ runner.temp }}/terraform
+        run: terraform init -backend=false
+      - name: Validate
+        working-directory: ${{ runner.temp }}/terraform
+        run: terraform validate
+      - name: Security scan
+        uses: aquasecurity/trivy-action@0.32.0
+        with:
+          scan-type: config
+          scan-ref: ${{ runner.temp }}/terraform
+          severity: CRITICAL,HIGH
+          exit-code: "1"

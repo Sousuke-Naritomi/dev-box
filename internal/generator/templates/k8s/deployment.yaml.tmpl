@@ -18,6 +18,8 @@ spec:
       {{- if .RunAsNonRoot }}
       securityContext:
         runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       {{- end }}
       containers:
         - name: {{ .Name }}
@@ -27,6 +29,15 @@ spec:
           {{- end }}
           ports:
             - containerPort: {{ .Port }}
+          {{- if .HardenContainer }}
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: {{ .RunAsUser }}
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          {{- end }}
           resources:
             requests:
               cpu: "100m"

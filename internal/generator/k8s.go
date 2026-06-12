@@ -16,12 +16,24 @@ type k8sService struct {
 	Port            int
 	Replicas        int
 	RunAsNonRoot    bool
+	RunAsUser       int64
+	HardenContainer bool
 	HasDBSecret     bool
 	HealthCmd       []string
 	HealthPath      string
 	VolumeMountPath string
 	EnvPasswordKey  string
 	ServiceType     string
+}
+
+type networkPolicyData struct {
+	HasFrontend  bool
+	HasBackend   bool
+	HasDatabase  bool
+	HasCache     bool
+	FrontendPort int
+	BackendPort  int
+	DatabasePort int
 }
 
 // GenerateK8sManifests generates Kubernetes Deployment, Service, and PVC manifests
@@ -35,25 +47,46 @@ func GenerateK8sManifests(cfg config.ProjectConfig) (map[string]FileDef, error) 
 	}
 	manifests["namespace.yaml"] = FileDef{Content: string(nsContent), Perm: 0644}
 
-	netPolContent, err := FS.ReadFile("templates/k8s/networkpolicy.yaml.tmpl")
+	netPolTmpl, err := template.ParseFS(FS, "templates/k8s/networkpolicy.yaml.tmpl")
 	if err != nil {
-		return nil, fmt.Errorf("failed to read k8s networkpolicy template: %w", err)
+		return nil, fmt.Errorf("failed to parse k8s networkpolicy template: %w", err)
 	}
-	manifests["networkpolicy.yaml"] = FileDef{Content: string(netPolContent), Perm: 0644}
+	policyData := networkPolicyData{
+		HasFrontend: cfg.Frontend != config.FrontendNone,
+		HasBackend:  cfg.Backend != config.BackendNone,
+		HasDatabase: cfg.Database != config.DatabaseNone,
+		HasCache:    cfg.Cache == config.CacheRedis,
+	}
+	if f, ok := registry.SupportedFrontends[cfg.Frontend]; ok {
+		policyData.FrontendPort = f.ImagePort
+	}
+	if b, ok := registry.SupportedBackends[cfg.Backend]; ok {
+		policyData.BackendPort = b.ImagePort
+	}
+	if cfg.Database == config.DatabaseMySQL {
+		policyData.DatabasePort = 3306
+	} else if cfg.Database == config.DatabasePostgres {
+		policyData.DatabasePort = 5432
+	}
+	var netPol bytes.Buffer
+	if err := netPolTmpl.Execute(&netPol, policyData); err != nil {
+		return nil, fmt.Errorf("failed to render k8s networkpolicy template: %w", err)
+	}
+	manifests["networkpolicy.yaml"] = FileDef{Content: netPol.String(), Perm: 0644}
 
 	var services []k8sService
 
 	if f, ok := registry.SupportedFrontends[cfg.Frontend]; ok {
 		services = append(services, k8sService{
-			Name: "frontend", Image: "dev-box-frontend:latest", ImagePullPolicy: "IfNotPresent", Port: f.InternalPort,
-			Replicas: 2, RunAsNonRoot: true, HealthPath: "/", ServiceType: "LoadBalancer",
+			Name: "frontend", Image: "dev-box-frontend:latest", ImagePullPolicy: "IfNotPresent", Port: f.ImagePort,
+			Replicas: 2, RunAsNonRoot: true, RunAsUser: f.RunAsUser, HardenContainer: true, HealthPath: "/", ServiceType: "LoadBalancer",
 		})
 	}
 
 	if b, ok := registry.SupportedBackends[cfg.Backend]; ok {
 		services = append(services, k8sService{
-			Name: "api", Image: "dev-box-api:latest", ImagePullPolicy: "IfNotPresent", Port: b.InternalPort,
-			Replicas: 2, RunAsNonRoot: true, HealthPath: "/health", ServiceType: "ClusterIP",
+			Name: "api", Image: "dev-box-api:latest", ImagePullPolicy: "IfNotPresent", Port: b.ImagePort,
+			Replicas: 2, RunAsNonRoot: true, RunAsUser: b.RunAsUser, HardenContainer: true, HealthPath: "/health", ServiceType: "ClusterIP",
 		})
 	}
 
@@ -79,7 +112,7 @@ func GenerateK8sManifests(cfg config.ProjectConfig) (map[string]FileDef, error) 
 	if cfg.Cache == config.CacheRedis {
 		services = append(services, k8sService{
 			Name: "cache", Image: "redis:" + config.VersionRedis, Port: 6379,
-			Replicas: 1, RunAsNonRoot: true, HasDBSecret: false,
+			Replicas: 1, RunAsNonRoot: true, RunAsUser: 999, HardenContainer: true, HasDBSecret: false,
 			HealthCmd: []string{"redis-cli", "ping"}, ServiceType: "ClusterIP",
 		})
 	}

@@ -103,6 +103,9 @@ func TestGenerateK8sManifests_AllBackends(t *testing.T) {
 			if !strings.Contains(content.Content, "path: /health") {
 				t.Error("expected backend probe to target /health")
 			}
+			if !strings.Contains(content.Content, "runAsUser:") || !strings.Contains(content.Content, "allowPrivilegeEscalation: false") {
+				t.Error("expected backend manifest to enforce non-root container security")
+			}
 		})
 	}
 }

@@ -146,8 +146,20 @@ func RenderGitignore() string {
 }
 
 // RenderPrometheusConfig returns the prometheus.yml configuration content.
-func RenderPrometheusConfig() (string, error) {
-	b, err := FS.ReadFile("templates/prometheus.yml.tmpl")
+func RenderPrometheusConfig(backendPort int) (string, error) {
+	tmpl, err := template.ParseFS(FS, "templates/prometheus.yml.tmpl")
+	if err != nil {
+		return "", err
+	}
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, struct{ BackendPort int }{BackendPort: backendPort}); err != nil {
+		return "", err
+	}
+	return buf.String(), nil
+}
+
+func RenderGrafanaDatasource() (string, error) {
+	b, err := FS.ReadFile("templates/grafana-datasource.yml.tmpl")
 	return string(b), err
 }
 

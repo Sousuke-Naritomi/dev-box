@@ -9,3 +9,21 @@ variable "admin_username" {
   type        = string
   default     = "azureuser"
 }
+
+variable "allowed_ssh_cidrs" {
+  description = "CIDR blocks allowed to connect over SSH; empty disables public SSH"
+  type        = list(string)
+  default     = []
+}
+
+variable "enable_public_web" {
+  description = "Whether to expose HTTP publicly"
+  type        = bool
+  default     = false
+}
+
+variable "allowed_web_cidrs" {
+  description = "CIDR blocks allowed to access HTTP"
+  type        = list(string)
+  default     = []
+}

@@ -49,6 +49,14 @@ func TestGenerateTerraform_AWS(t *testing.T) {
 	if !strings.Contains(varsTF.Content, "key_name") {
 		t.Error("expected variables.tf to contain key_name variable")
 	}
+	if !strings.Contains(varsTF.Content, "allowed_ssh_cidrs") || !strings.Contains(varsTF.Content, "default     = []") {
+		t.Error("expected SSH ingress to be disabled by default")
+	}
+	for _, securitySetting := range []string{"http_tokens   = \"required\"", "encrypted = true", "enable_public_web"} {
+		if !strings.Contains(mainTF.Content+varsTF.Content, securitySetting) {
+			t.Errorf("expected AWS Terraform to contain %q", securitySetting)
+		}
+	}
 }
 
 func TestGenerateTerraform_GCP(t *testing.T) {
@@ -61,6 +69,12 @@ func TestGenerateTerraform_GCP(t *testing.T) {
 	}
 	if !strings.Contains(files["variables.tf"].Content, "project_id") {
 		t.Error("expected project_id variable")
+	}
+	if !strings.Contains(files["main.tf"].Content, "enable-oslogin") {
+		t.Error("expected GCP OS Login to be enabled")
+	}
+	if !strings.Contains(files["variables.tf"].Content, "allowed_ssh_cidrs") {
+		t.Error("expected GCP SSH CIDR allowlist")
 	}
 }
 
@@ -87,6 +101,12 @@ func TestGenerateTerraform_Azure(t *testing.T) {
 	}
 	if !strings.Contains(files["main.tf"].Content, "azurerm_virtual_network") {
 		t.Error("expected Azure main.tf to contain virtual network")
+	}
+	if !strings.Contains(files["main.tf"].Content, "secure_boot_enabled = true") {
+		t.Error("expected Azure secure boot")
+	}
+	if !strings.Contains(files["variables.tf"].Content, "allowed_ssh_cidrs") {
+		t.Error("expected Azure SSH CIDR allowlist")
 	}
 }
 

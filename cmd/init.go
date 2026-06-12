@@ -3,8 +3,11 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 
 	"golang.org/x/term"
 
@@ -34,6 +37,8 @@ func init() {
 	initCmd.Flags().Bool("monitoring", false, "Include Monitoring (Prometheus + Grafana + Loki)")
 	initCmd.Flags().Bool("cicd", false, "Include CI/CD Pipeline")
 	initCmd.Flags().Bool("force", false, "Overwrite existing files without prompting")
+	initCmd.Flags().Bool("dry-run", false, "Print generated files without writing them")
+	initCmd.Flags().String("output-dir", ".", "Directory to write generated files into")
 	rootCmd.AddCommand(initCmd)
 }
 
@@ -132,10 +137,12 @@ func runInit(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	return runInitLogic(cmd.Context(), cfg, app.FS, app.Gen)
+	outputDir, _ := cmd.Flags().GetString("output-dir")
+	dryRun, _ := cmd.Flags().GetBool("dry-run")
+	return runInitLogic(cmd.Context(), cfg, outputDir, dryRun, cmd.OutOrStdout(), app.FS, app.Gen)
 }
 
-func runInitLogic(ctx context.Context, cfg config.ProjectConfig, fileSystem fs.FileSystem, gen generator.Generator) error {
+func runInitLogic(ctx context.Context, cfg config.ProjectConfig, outputDir string, dryRun bool, output io.Writer, fileSystem fs.FileSystem, gen generator.Generator) error {
 	fmt.Printf("\n✨ Generating environment for: Frontend=%s, Backend=%s, Database=%s\n", cfg.Frontend, cfg.Backend, cfg.Database)
 
 	// Resolve ports and passwords
@@ -156,6 +163,9 @@ func runInitLogic(ctx context.Context, cfg config.ProjectConfig, fileSystem fs.F
 	// Generate .env and .gitignore if needed
 	needsEnv := (cfg.Database != "none" && cfg.Database != "") || cfg.Monitoring || (cfg.Backend != "none" && cfg.Backend != "")
 	if needsEnv {
+		if runtime.GOOS == "windows" {
+			fmt.Fprintln(output, "Note: verify the Windows ACL on .env; POSIX mode 0600 does not map directly to NTFS permissions.")
+		}
 		envContent, err := generator.RenderEnvFile(data)
 		if err != nil {
 			return fmt.Errorf("rendering env file: %w", err)
@@ -191,11 +201,17 @@ func runInitLogic(ctx context.Context, cfg config.ProjectConfig, fileSystem fs.F
 
 	// Generate monitoring configs
 	if cfg.Monitoring {
-		promConfig, err := generator.RenderPrometheusConfig()
+		promConfig, err := generator.RenderPrometheusConfig(backendInternalPort)
 		if err != nil {
 			return err
 		}
 		filesToWrite[filepath.Join("monitoring", "prometheus.yml")] = generator.FileDef{Content: promConfig, Perm: 0644}
+
+		grafanaDatasource, err := generator.RenderGrafanaDatasource()
+		if err != nil {
+			return err
+		}
+		filesToWrite[filepath.Join("monitoring", "grafana", "provisioning", "datasources", "prometheus.yml")] = generator.FileDef{Content: grafanaDatasource, Perm: 0644}
 
 		promtailConfig, err := generator.RenderPromtailConfig()
 		if err != nil {
@@ -224,12 +240,14 @@ func runInitLogic(ctx context.Context, cfg config.ProjectConfig, fileSystem fs.F
 
 	var existingFiles []string
 	for path := range filesToWrite {
-		if fileSystem.Exists(path) {
-			existingFiles = append(existingFiles, path)
+		target := generatedTargetPath(outputDir, path)
+		if fileSystem.Exists(target) {
+			existingFiles = append(existingFiles, target)
 		}
 	}
 
-	if len(existingFiles) > 0 && !cfg.Force {
+	if len(existingFiles) > 0 && !cfg.Force && !dryRun {
+		fmt.Fprintf(output, "Existing files would be overwritten:\n  %s\n", strings.Join(existingFiles, "\n  "))
 		isTerminal := term.IsTerminal(int(os.Stdin.Fd()))
 		if !isTerminal {
 			return fmt.Errorf("non-interactive environment detected and existing files found; use --force to overwrite")
@@ -249,13 +267,11 @@ func runInitLogic(ctx context.Context, cfg config.ProjectConfig, fileSystem fs.F
 		}
 	}
 
-	for path, fd := range filesToWrite {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		if err := fileSystem.WriteFile(path, []byte(fd.Content), fd.Perm); err != nil {
-			return fmt.Errorf("writing %s: %w", path, err)
-		}
+	if err := writeGeneratedFiles(ctx, fileSystem, outputDir, filesToWrite, true, dryRun, output); err != nil {
+		return err
+	}
+	if dryRun {
+		return nil
 	}
 
 	fmt.Println("✅ Successfully generated local environment configuration!")

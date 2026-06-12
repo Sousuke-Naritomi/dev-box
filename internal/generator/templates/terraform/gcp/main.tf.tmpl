@@ -14,13 +14,26 @@ provider "google" {
 }
 
 resource "google_compute_firewall" "devbox" {
+	count   = length(var.allowed_ssh_cidrs) > 0 ? 1 : 0
   name    = "devbox-firewall"
   network = "default"
   allow {
     protocol = "tcp"
-    ports    = ["22", "80", "443"]
+    ports    = ["22"]
   }
-  source_ranges = ["0.0.0.0/0"]
+  source_ranges = var.allowed_ssh_cidrs
+  target_tags   = ["devbox"]
+}
+
+resource "google_compute_firewall" "web" {
+  count   = var.enable_public_web && length(var.allowed_web_cidrs) > 0 ? 1 : 0
+  name    = "devbox-web-firewall"
+  network = "default"
+  allow {
+    protocol = "tcp"
+    ports    = ["80", "443"]
+  }
+  source_ranges = var.allowed_web_cidrs
   target_tags   = ["devbox"]
 }
 
@@ -29,6 +42,16 @@ resource "google_compute_instance" "devbox" {
   machine_type = "e2-micro"
   zone         = var.zone
   tags         = ["devbox"]
+
+  metadata = {
+    enable-oslogin = "TRUE"
+  }
+
+  shielded_instance_config {
+    enable_secure_boot          = true
+    enable_vtpm                 = true
+    enable_integrity_monitoring = true
+  }
 
   boot_disk {
     initialize_params {

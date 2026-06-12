@@ -7,6 +7,8 @@ type FrontendFramework struct {
 	Name         string
 	Image        string
 	InternalPort int
+	ImagePort    int
+	RunAsUser    int64
 	Command      string
 	Volumes      []string
 	TemplateDir  string
@@ -18,7 +20,9 @@ var SupportedFrontends = map[config.FrontendType]FrontendFramework{
 		Name:         "React (Vite)",
 		Image:        "node:" + config.VersionNode,
 		InternalPort: 5173,
-		Command:      `sh -c "npm install && npm run dev -- --host 0.0.0.0"`,
+		ImagePort:    8080,
+		RunAsUser:    101,
+		Command:      `sh -c "npm ci && npm run dev -- --host 0.0.0.0"`,
 		Volumes:      []string{"./frontend:/app", "frontend-node-modules:/app/node_modules"},
 		TemplateDir:  "templates/scaffold/frontend/react",
 	},
@@ -27,7 +31,9 @@ var SupportedFrontends = map[config.FrontendType]FrontendFramework{
 		Name:         "Vue.js (Vite)",
 		Image:        "node:" + config.VersionNode,
 		InternalPort: 5173,
-		Command:      `sh -c "npm install && npm run dev -- --host 0.0.0.0"`,
+		ImagePort:    8080,
+		RunAsUser:    101,
+		Command:      `sh -c "npm ci && npm run dev -- --host 0.0.0.0"`,
 		Volumes:      []string{"./frontend:/app", "frontend-node-modules:/app/node_modules"},
 		TemplateDir:  "templates/scaffold/frontend/vue",
 	},

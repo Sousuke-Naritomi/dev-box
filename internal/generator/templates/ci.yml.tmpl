@@ -51,16 +51,21 @@ jobs:
       - name: Wait for healthy services
         run: |
           echo "Waiting for services..."
+          ready=false
           for i in $(seq 1 30); do
-            if docker compose ps --format json | jq -e 'select(.Health == "starting")' > /dev/null 2>&1; then
-              echo "Attempt $i/30: services still starting..."
-              sleep 5
-            else
+            if docker compose ps --format json | jq -s -e 'length > 0 and all(.[]; .State == "running" and (.Health == "" or .Health == "healthy"))' > /dev/null; then
               echo "All services ready."
+              ready=true
               break
             fi
+            echo "Attempt $i/30: services are not ready..."
+            sleep 5
           done
           docker compose ps
+          if [ "$ready" != "true" ]; then
+            docker compose logs
+            exit 1
+          fi
 
 {{- if .HasBackend }}
       - name: Verify API response

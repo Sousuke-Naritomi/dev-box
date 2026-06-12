@@ -22,11 +22,12 @@ var app = &App{
 }
 
 var rootCmd = &cobra.Command{
-	Use:   "dev-box",
-	Short: "dev-box is a CLI tool to quickly spin up development environments",
-	Long:  `A fast and flexible CLI tool built in Go that generates docker-compose, Kubernetes, and Terraform configurations.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		cmd.Help()
+	Use:     "dev-box",
+	Version: Version,
+	Short:   "dev-box is a CLI tool to quickly spin up development environments",
+	Long:    `A fast and flexible CLI tool built in Go that generates docker-compose, Kubernetes, and Terraform configurations.`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return cmd.Help()
 	},
 }
 

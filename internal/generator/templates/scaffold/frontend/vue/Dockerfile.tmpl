@@ -1,6 +1,11 @@
-FROM node:{{ .VersionNode }}
+FROM node:{{ .VersionNode }} AS build
 WORKDIR /app
 COPY package*.json ./
-RUN npm install
+RUN npm ci
 COPY . .
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+RUN npm run build
+
+FROM nginxinc/nginx-unprivileged:{{ .VersionNginx }}
+COPY --from=build --chown=101:101 /app/dist /usr/share/nginx/html
+USER 101:101
+EXPOSE 8080

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -10,7 +11,7 @@ import (
 // getDockerCmd determines the appropriate docker command (docker or podman)
 // and checks if it's available. It also provides a helpful error message if
 // the docker daemon is unreachable (e.g. requires sudo).
-func getDockerCmd() (string, error) {
+func getDockerCmd(ctx context.Context) (string, error) {
 	cmd := os.Getenv("DOCKER_CMD")
 	if cmd == "" {
 		if _, err := exec.LookPath("docker"); err == nil {
@@ -27,7 +28,7 @@ func getDockerCmd() (string, error) {
 	}
 
 	// Simple check to see if we can connect to the daemon.
-	checkCmd := exec.Command(cmd, "info")
+	checkCmd := exec.CommandContext(ctx, cmd, "info")
 	out, err := checkCmd.CombinedOutput()
 	if err != nil {
 		outStr := strings.ToLower(string(out))

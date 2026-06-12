@@ -3,7 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"path/filepath"
+	"io"
 
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
@@ -21,56 +21,47 @@ var deployCmd = &cobra.Command{
 
 func init() {
 	deployCmd.Flags().String("provider", "", "Cloud provider to deploy to (aws, gcp, azure)")
+	deployCmd.Flags().Bool("force", false, "Overwrite existing files without prompting")
+	deployCmd.Flags().Bool("dry-run", false, "Print generated files without writing them")
+	deployCmd.Flags().String("output-dir", "terraform", "Directory to write Terraform files into")
 	rootCmd.AddCommand(deployCmd)
 }
 
 func runDeploy(cmd *cobra.Command, args []string) error {
-	ctx := cmd.Context()
 	provider, _ := cmd.Flags().GetString("provider")
 	if provider == "" {
-		form := huh.NewForm(
-			huh.NewGroup(
-				huh.NewSelect[string]().
-					Title("Choose your Cloud Provider").
-					Options(
-						huh.NewOption("AWS (Amazon Web Services)", "aws"),
-						huh.NewOption("GCP (Google Cloud Platform)", "gcp"),
-						huh.NewOption("Azure (Microsoft Azure)", "azure"),
-					).Value(&provider),
-			),
-		)
-
+		form := huh.NewForm(huh.NewGroup(
+			huh.NewSelect[string]().
+				Title("Choose your Cloud Provider").
+				Options(
+					huh.NewOption("AWS (Amazon Web Services)", "aws"),
+					huh.NewOption("GCP (Google Cloud Platform)", "gcp"),
+					huh.NewOption("Azure (Microsoft Azure)", "azure"),
+				).
+				Value(&provider),
+		))
 		if err := form.Run(); err != nil {
 			return fmt.Errorf("form cancelled: %w", err)
 		}
 	}
 
-	fmt.Printf("\n☁️  Generating Terraform configuration for %s...\n", provider)
-
-	if err := runDeployLogic(ctx, provider, app.FS, app.Gen); err != nil {
+	force, _ := cmd.Flags().GetBool("force")
+	dryRun, _ := cmd.Flags().GetBool("dry-run")
+	outputDir, _ := cmd.Flags().GetString("output-dir")
+	fmt.Fprintf(cmd.OutOrStdout(), "\nGenerating Terraform configuration for %s...\n", provider)
+	if err := runDeployLogic(cmd.Context(), provider, outputDir, force, dryRun, cmd.OutOrStdout(), app.FS, app.Gen); err != nil {
 		return err
 	}
-
-	fmt.Println("✅ Successfully generated Terraform files in terraform/ directory!")
-	fmt.Println("👉 Next steps: cd terraform && terraform init && terraform plan")
+	if !dryRun {
+		fmt.Fprintf(cmd.OutOrStdout(), "Successfully generated Terraform files in %s.\n", outputDir)
+	}
 	return nil
 }
 
-func runDeployLogic(ctx context.Context, provider string, fileSystem fs.FileSystem, gen generator.Generator) error {
+func runDeployLogic(ctx context.Context, provider, outputDir string, force, dryRun bool, output io.Writer, fileSystem fs.FileSystem, gen generator.Generator) error {
 	files, err := gen.GenerateTerraform(provider)
 	if err != nil {
 		return fmt.Errorf("generating terraform: %w", err)
 	}
-
-	outDir := "terraform"
-	for name, fd := range files {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		if err := fileSystem.WriteFile(filepath.Join(outDir, name), []byte(fd.Content), fd.Perm); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return writeGeneratedFiles(ctx, fileSystem, outputDir, files, force, dryRun, output)
 }
