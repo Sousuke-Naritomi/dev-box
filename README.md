@@ -1,34 +1,35 @@
-# dev-box 🚀
+# dev-box
 
-`dev-box` は、ローカル開発環境から本番環境へのデプロイ（Docker Compose、Kubernetes、Terraform）まで、セキュアで即座に使える環境を自動生成する高速で柔軟なGo言語製のCLIツールです。
+dev-boxは、ローカル開発環境の構築から本番環境向けのマニフェストおよびインフラストラクチャ・アズ・コード（IaC）リソースの生成までを自動化するためのコマンドライン・インターフェース（CLI）ツールです。Go言語で開発されており、単一のバイナリとして動作します。
 
-## ✨ 主な機能
+本ツールは、対話式プロンプトまたはコマンドライン引数による設定に基づき、フルスタック・アプリケーションの土台となるボイラープレート、Docker Compose設定、Kubernetesマニフェスト、およびTerraform構成ファイルを安全かつ再現可能な形で生成します。
 
-- **対話型スカフォールド**: CLIの対話形式、またはコマンドライン引数を使って、フルスタックプロジェクト（フロントエンド ＋ バックエンド ＋ データベース）を瞬時に構築します。
-- **サポートしているフレームワーク**:
-  - **フロントエンド**: React (Vite), Vue.js (Vite)
-  - **バックエンド**: Node.js (Express), Python (Flask), Go, PHP (Apache), Java (HttpServer)
-  - **データベース**: PostgreSQL, MySQL
-  - **キャッシュ**: Redis
-- **高度なアーキテクチャ設計とセキュリティ**:
-  - ローカル開発用のポート（`InternalPort`：ホットリロード対応）と、Kubernetes 運用時のポート（`ImagePort`）を分離したマルチステージ Dockerfile を自動生成。
-  - すべての言語において、特権を持たない非rootコンテナ（`10001` や `101` などの標準ユーザー）として実行される設計。
-- **本番環境水準の Kubernetes 対応**:
-  - `dev-box k8s` コマンドで、`Deployment`, `Service`, `PVC` マニフェストを生成。
-  - デフォルトで強固なセキュリティ設定: `seccompProfile` の適用、全 Capability のドロップ、非 root 実行 (`RunAsUser`) を強制。
-  - ゼロトラストネットワーク: 厳格な Ingress / Egress 制御を行う `NetworkPolicy` を自動生成。
-- **クラウドインフラ (IaC) 生成**: `dev-box deploy` で、AWS、GCP、Azure向けの Terraform モジュールを生成。
-- **組み込みアドオン**:
-  - 🔄 **Nginx リバースプロキシ**: ローカル開発時の API ルーティングを自動化。
-  - ☁️ **LocalStack**: AWSのローカルモック環境。
-  - 📈 **オブザーバビリティ (監視)**: Prometheus, Grafana, Promtail/Loki の設定を事前構成。
-  - 🤖 **CI/CD**: 自動テストやビルド用の GitHub Actions ワークフローを生成。
+## 1. 概要とアーキテクチャ
 
----
+dev-boxが生成する環境は、単なるコードの雛形ではなく、本番環境を見据えたエンタープライズ・グレードのアーキテクチャ設計とセキュリティ基準に準拠しています。
 
-## 📦 インストール方法
+### 1.1. 関心の分離（Port Separation）
+ローカル開発環境とKubernetes配備時のプロセス実行環境の要件の違いを吸収するため、各コンテナにおけるポート設計を明確に分離しています。
+*   **InternalPort**: ローカル開発時（Docker Compose）に使用されます。各フレームワークの標準ポート（Viteの5173、Expressの3000等）を維持し、ホットリロードやデバッグの利便性を損ないません。
+*   **ImagePort**: Kubernetesでの稼働時（Dockerイメージビルド後）に使用されます。マルチステージビルドを経て生成される本番向けコンテナは、一律で非特権ポート（8080等）を公開するように設計されています。
 
-*(Go言語がインストールされている必要があります)*
+### 1.2. セキュリティと権限最小化
+Kubernetesマニフェスト（YAML）およびDockerfileは、セキュリティのベストプラクティスに従い厳格に設計されています。
+*   **非特権ユーザーによる実行**: すべてのバックエンドおよびフロントエンドコンテナは、ビルドプロセス内で専用の非rootユーザー（UID 10001, 101等）を作成し、`USER`ディレクティブを通じて実行権限を最小化しています。
+*   **コンテナの堅牢化（Hardening）**: Kubernetes Deploymentマニフェストにおいて、`runAsNonRoot: true`、`allowPrivilegeEscalation: false`、`capabilities: drop: ["ALL"]` を強制し、コンテナの特権昇格や不要なシステムコールを遮断します。
+*   **seccompプロファイルの適用**: `seccompProfile: { type: RuntimeDefault }` を指定し、ホストカーネルへのアクセスを制限しています。
+
+### 1.3. ゼロトラスト・ネットワーク
+Kubernetes環境において、ネームスペース内の通信はデフォルトで遮断されます（Default Deny）。
+dev-boxが生成するNetworkPolicyマニフェストは、以下の通り必要な通信のみを明示的に許可するホワイトリスト方式を採用しています。
+*   フロントエンドからバックエンドAPIへのEgress許可
+*   バックエンドAPIからデータベースおよびキャッシュ（Redis）へのEgress許可
+*   全Podからkube-dns（ポート53 UDP/TCP）へのDNS解決のためのEgress許可
+*   Ingress ControllerからフロントエンドへのIngress許可
+
+## 2. インストール手順
+
+Go言語がインストールされている環境で、以下のコマンドを実行してビルドを行います。
 
 ```bash
 git clone https://github.com/Sousuke-Naritomi/dev-box.git
@@ -36,66 +37,114 @@ cd dev-box
 go build -o dev-box .
 ```
 
-生成されたバイナリを `PATH` の通ったディレクトリに移動してご利用ください。
+ビルドされた `dev-box` バイナリを実行可能なパスに配置してください。
 
----
+## 3. サポートされているテクノロジースタック
 
-## 🚀 使い方
+dev-boxは以下の技術スタックの組み合わせをサポートしています。
 
-### 1. ローカル環境の初期化 (`dev-box init`)
+### フロントエンド (Frontend)
+*   React (Vite)
+*   Vue.js (Vite)
+*   none (フロントエンドなし)
 
-対話モード、またはフラグを指定して `docker-compose.yml`、ベースコード、`.env`、Nginx 設定などを生成します。
+### バックエンド (Backend)
+*   Go
+*   Python (Flask)
+*   Node.js (Express)
+*   Java (HttpServer)
+*   PHP (Apache)
+*   none (バックエンドなし)
 
+### データベース (Database)
+*   PostgreSQL
+*   MySQL
+*   none (データベースなし)
+
+### キャッシュ・メッセージブローカー (Cache)
+*   Redis
+*   none
+
+### アドオン (Addons)
+*   **Nginx Reverse Proxy**: バックエンドとフロントエンドへのルーティングを統括するAPIゲートウェイ（Docker Compose環境用）。
+*   **LocalStack**: AWSリソースのローカルモック環境。
+*   **Monitoring**: Prometheus、Grafana、およびPromtail/Lokiスタックによる監視とログ集約環境。
+*   **CI/CD**: GitHub Actions用のCIワークフロー構成ファイル。
+
+## 4. コマンドライン・リファレンス
+
+dev-boxは、用途に応じた複数のサブコマンドを提供します。
+
+### 4.1. 初期化コマンド: `dev-box init`
+現在のディレクトリ（または指定したディレクトリ）に開発環境を構築します。引数なしで実行した場合は、インタラクティブなウィザードが起動します。
+
+**フラグによる非対話的実行の例:**
 ```bash
-# 対話モード
-./dev-box init
-
-# 非対話モード（CI/CDなどで便利です）
-./dev-box init --frontend react --backend go --database postgres --monitoring --cicd
+dev-box init \
+  --frontend react \
+  --backend go \
+  --database postgres \
+  --cache redis \
+  --nginx \
+  --monitoring \
+  --cicd \
+  --output-dir ./my-project
 ```
 
-**`init` で便利なフラグ**:
-- `--output-dir <dir>`: カレントディレクトリではなく、指定したディレクトリにファイルを生成します。
-- `--dry-run`: 実際にファイルを書き込まずに、生成される内容をプレビューします。
-- `--force`: 既存のファイルがある場合でも、確認プロンプトをスキップして上書きします。
+**主要オプション:**
+*   `--dry-run`: 実際のファイルシステムへの書き込みを行わず、生成されるファイル群と内容を出力します。
+*   `--force`: 既存のファイルと競合が発生した場合でも、警告を出さずに上書きします。
+*   `--output-dir`: ファイルを生成するターゲットディレクトリを指定します（デフォルトはカレントディレクトリ）。
 
-### 2. ローカル環境の操作
+### 4.2. 環境操作コマンド
+ローカル環境のDocker Composeライフサイクルを管理するラッパーコマンド群です。
 
-CLIから直接 Docker Compose 環境を操作できます：
+*   `dev-box start`: `docker compose up -d` をバックグラウンドで実行し、生成されたコンテナ群を起動します。
+*   `dev-box stop`: `docker compose down` を実行し、環境を停止・削除します。
+*   `dev-box status`: `docker compose ps` を実行し、コンテナの稼働状況を表示します。
+*   `dev-box logs`: `docker compose logs -f` を実行し、すべてのコンテナの標準出力をストリーム表示します。
 
-```bash
-./dev-box start    # docker compose up -d と同等
-./dev-box stop     # docker compose down と同等
-./dev-box status   # docker compose ps と同等
-./dev-box logs     # docker compose logs -f と同等
-```
-
-### 3. Kubernetes マニフェストの生成 (`dev-box k8s`)
-
-現在のスタック構成を元に、強固な Kubernetes YAML ファイルをエクスポートします（デフォルトでは `k8s-manifests/` フォルダに出力されます）。
+### 4.3. Kubernetesマニフェスト生成: `dev-box k8s`
+選択したスタックに適合するKubernetesマニフェスト一式（YAMLファイル）を生成します。
 
 ```bash
-./dev-box k8s --frontend react --backend go --database postgres --cache redis
+dev-box k8s --frontend react --backend go --database postgres --cache redis
 ```
-これにより、`api.yaml`, `frontend.yaml`, `db.yaml`, `cache.yaml`, `namespace.yaml` に加えて、極めて堅牢な `networkpolicy.yaml` が生成されます。
 
-### 4. Terraform クラウドインフラの生成 (`dev-box deploy`)
+**生成されるファイル（例）:**
+*   `namespace.yaml`: アプリケーションを隔離するためのネームスペース定義。
+*   `api.yaml`: バックエンドのDeploymentおよびClusterIP Service。
+*   `frontend.yaml`: フロントエンドのDeploymentおよびLoadBalancer Service。
+*   `db.yaml`: データベースのStatefulSet（またはDeployment）およびPersistentVolumeClaim。
+*   `cache.yaml`: RedisキャッシュのDeployment。
+*   `networkpolicy.yaml`: 前述のゼロトラスト・セキュリティに基づくきめ細やかなトラフィック制御ポリシー。
 
-コンテナをクラウドにデプロイするための Terraform 構成を生成します。
+### 4.4. クラウド・デプロイメント生成: `dev-box deploy`
+インフラ構築を自動化するためのTerraformコード（IaC）を生成します。
 
 ```bash
-./dev-box deploy --provider aws
+dev-box deploy --provider aws
 ```
 
----
+**サポートされるプロバイダ:**
+*   `aws`: Amazon Web Services 向けモジュール
+*   `gcp`: Google Cloud Platform 向けモジュール
+*   `azure`: Microsoft Azure 向けモジュール
 
-## 🔒 実装されているベストプラクティスとセキュリティ
+## 5. 自動生成される構成ファイルの詳細
 
-`dev-box` は単なる「Hello World」のボイラープレートではなく、エンタープライズの現場で通用するセキュリティに重きを置いています：
-- **クレデンシャルの自動生成**: 初期化時に暗号論的疑似乱数を用いた20文字の `.env` ファイルを生成し、自動的に `.gitignore` へ追加します。
-- **ゼロトラストな Kubernetes ネットワーク**: 明示的に許可されない限り、Pod同士やインターネットへの通信はできません（例：APIからDBへの通信は許可されるが、フロントエンドからDBへの直接通信は遮断）。
-- **ディストロレス＆マルチステージビルド**: GoはAlpine上で、React/Vueは非特権Nginx(`nginx-unprivileged`)上で動かすなど、最小限のフットプリントとセキュアな基盤で実行されます。
-- **ファイルシステムの保護**: シンボリックリンクの上書きを拒否し、Windows環境ではクレデンシャルファイルの NTFS パーミッションに関する警告を出力します。
+### 5.1. クレデンシャル管理 (`.env` および `.gitignore`)
+プロジェクトの初期化時、セキュアなパスワード（20文字の英数字および記号）が暗号論的疑似乱数生成器（CSPRNG）を用いて自動生成され、`.env`ファイルに書き込まれます。同時に、この`.env`ファイルは自動的に`.gitignore`に追記され、リポジトリへの偶発的なコミットを防止します。
 
-## 🤝 コントリビュート
-コントリビュート、Issueの報告、機能リクエストは大歓迎です！ぜひ Issues ページをご確認ください。
+### 5.2. Dockerfileの構造
+すべてのDockerfileは、ビルド環境と実行環境を分離したマルチステージビルドを採用しています。
+ビルドステージで依存関係の解決とコンパイルを行い、最終イメージには実行に必要なバイナリや静的ファイルのみをコピーすることで、イメージサイズの削減と攻撃表面（Attack Surface）の極小化を実現しています。
+
+### 5.3. 監視・オブザーバビリティ
+`--monitoring` フラグを有効にした場合、以下が自動設定されます。
+*   **Prometheus**: バックエンドアプリケーションの `/metrics` エンドポイントをスクレイプするように構成された `prometheus.yml`。
+*   **Grafana**: PrometheusおよびLokiをデータソースとして自動登録するためのプロビジョニング設定。
+*   **Loki / Promtail**: Dockerのログドライバーからログを収集し、統合的な可視化環境を提供。
+
+## 6. ライセンスと貢献について
+開発に参加する場合、リポジトリをフォークした上でFeature Branchを作成し、Pull Requestを通じてコードを提案してください。新規にサブコマンドを追加する場合や、ジェネレータのテンプレート（`internal/generator/templates` 以下）を修正する場合は、必ず既存のGo言語ユニットテストおよびE2Eテストがパスすることを確認してください。
