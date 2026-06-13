@@ -7,12 +7,10 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
-
-	"golang.org/x/term"
 
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 
 	"github.com/Sousuke-Naritomi/dev-box/internal/config"
 	"github.com/Sousuke-Naritomi/dev-box/internal/fs"
@@ -23,7 +21,7 @@ import (
 var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Initialize a new development environment",
-	Long:  `Run an interactive prompt to configure and generate your development environment.`,
+	Long:  `Run an interactive prompt or load dev-box.yaml to generate a development environment.`,
 	RunE:  runInit,
 }
 
@@ -36,6 +34,7 @@ func init() {
 	initCmd.Flags().Bool("localstack", false, "Include LocalStack")
 	initCmd.Flags().Bool("monitoring", false, "Include Monitoring (Prometheus + Grafana + Loki)")
 	initCmd.Flags().Bool("cicd", false, "Include CI/CD Pipeline")
+	initCmd.Flags().String("config", "", "Path to a dev-box.yaml project configuration")
 	initCmd.Flags().Bool("force", false, "Overwrite existing files without prompting")
 	initCmd.Flags().Bool("dry-run", false, "Print generated files without writing them")
 	initCmd.Flags().String("output-dir", ".", "Directory to write generated files into")
@@ -43,125 +42,110 @@ func init() {
 }
 
 func runInit(cmd *cobra.Command, args []string) error {
-	cfg := config.ProjectConfig{}
-
-	frontendStr, _ := cmd.Flags().GetString("frontend")
-	backendStr, _ := cmd.Flags().GetString("backend")
-	databaseStr, _ := cmd.Flags().GetString("database")
-	cacheStr, _ := cmd.Flags().GetString("cache")
-
-	cfg.Frontend = config.FrontendType(frontendStr)
-	cfg.Backend = config.BackendType(backendStr)
-	cfg.Database = config.DatabaseType(databaseStr)
-	cfg.Cache = config.CacheType(cacheStr)
-	cfg.Nginx, _ = cmd.Flags().GetBool("nginx")
-	cfg.LocalStack, _ = cmd.Flags().GetBool("localstack")
-	cfg.Monitoring, _ = cmd.Flags().GetBool("monitoring")
-	cfg.CICD, _ = cmd.Flags().GetBool("cicd")
+	configPath, _ := cmd.Flags().GetString("config")
+	cfg, err := loadProjectConfig(app.FS, configPath)
+	if err != nil {
+		return err
+	}
+	applyCoreFlags(cmd, &cfg)
+	applyAddonFlags(cmd, &cfg)
 	cfg.Force, _ = cmd.Flags().GetBool("force")
 
-	if cfg.Frontend == "" || cfg.Backend == "" || cfg.Database == "" || cfg.Cache == "" {
-		isTerminal := term.IsTerminal(int(os.Stdin.Fd()))
-		if !isTerminal && !cfg.Force {
-			return fmt.Errorf("non-interactive environment detected. Please provide all required flags or use --force")
+	frontend := string(cfg.Frontend)
+	backend := string(cfg.Backend)
+	database := string(cfg.Database)
+	cache := string(cfg.Cache)
+
+	if frontend == "" || backend == "" || database == "" || cache == "" {
+		if !term.IsTerminal(int(os.Stdin.Fd())) {
+			return fmt.Errorf("non-interactive environment detected; provide all stack values with flags or --config")
 		}
 
 		var fields []huh.Field
-
-		if frontendStr == "" {
-			fields = append(fields, huh.NewSelect[string]().
-				Title("Choose your Frontend Framework").
-				Options(
-					huh.NewOption("React (Vite)", "react"),
-					huh.NewOption("Vue.js (Vite)", "vue"),
-					huh.NewOption("None", "none"),
-				).Value(&frontendStr))
+		if frontend == "" {
+			fields = append(fields, huh.NewSelect[string]().Title("Choose your Frontend Framework").Options(
+				huh.NewOption("React (Vite)", "react"),
+				huh.NewOption("Vue.js (Vite)", "vue"),
+				huh.NewOption("None", "none"),
+			).Value(&frontend))
 		}
-		if backendStr == "" {
-			fields = append(fields, huh.NewSelect[string]().
-				Title("Choose your Backend Language").
-				Options(
-					huh.NewOption("Node.js (Express)", "node"),
-					huh.NewOption("Python (Flask)", "python"),
-					huh.NewOption("Go (net/http)", "go"),
-					huh.NewOption("PHP (Apache)", "php"),
-					huh.NewOption("Java (HttpServer)", "java"),
-					huh.NewOption("None", "none"),
-				).Value(&backendStr))
+		if backend == "" {
+			fields = append(fields, huh.NewSelect[string]().Title("Choose your Backend Language").Options(
+				huh.NewOption("Node.js (Express)", "node"),
+				huh.NewOption("Python (Flask)", "python"),
+				huh.NewOption("Go (net/http)", "go"),
+				huh.NewOption("PHP (Apache)", "php"),
+				huh.NewOption("Java (HttpServer)", "java"),
+				huh.NewOption("None", "none"),
+			).Value(&backend))
 		}
-		if databaseStr == "" {
-			fields = append(fields, huh.NewSelect[string]().
-				Title("Choose your Database").
-				Options(
-					huh.NewOption("MySQL", "mysql"),
-					huh.NewOption("PostgreSQL", "postgres"),
-					huh.NewOption("None", "none"),
-				).Value(&databaseStr))
+		if database == "" {
+			fields = append(fields, huh.NewSelect[string]().Title("Choose your Database").Options(
+				huh.NewOption("MySQL", "mysql"),
+				huh.NewOption("PostgreSQL", "postgres"),
+				huh.NewOption("None", "none"),
+			).Value(&database))
 		}
-		if cacheStr == "" {
-			fields = append(fields, huh.NewSelect[string]().
-				Title("Choose your Cache").
-				Options(
-					huh.NewOption("Redis", "redis"),
-					huh.NewOption("None", "none"),
-				).Value(&cacheStr))
+		if cache == "" {
+			fields = append(fields, huh.NewSelect[string]().Title("Choose your Cache").Options(
+				huh.NewOption("Redis", "redis"),
+				huh.NewOption("None", "none"),
+			).Value(&cache))
 		}
 
-		if !cmd.Flags().Changed("nginx") {
+		// A supplied project file is complete and should not re-prompt for addons.
+		if configPath == "" && !cmd.Flags().Changed("nginx") {
 			fields = append(fields, huh.NewConfirm().Title("Include Nginx Reverse Proxy?").Value(&cfg.Nginx))
 		}
-		if !cmd.Flags().Changed("localstack") {
+		if configPath == "" && !cmd.Flags().Changed("localstack") {
 			fields = append(fields, huh.NewConfirm().Title("Include LocalStack? (AWS Local Emulator)").Value(&cfg.LocalStack))
 		}
-		if !cmd.Flags().Changed("monitoring") {
+		if configPath == "" && !cmd.Flags().Changed("monitoring") {
 			fields = append(fields, huh.NewConfirm().Title("Include Monitoring? (Prometheus + Grafana + Loki)").Value(&cfg.Monitoring))
 		}
-		if !cmd.Flags().Changed("cicd") {
+		if configPath == "" && !cmd.Flags().Changed("cicd") {
 			fields = append(fields, huh.NewConfirm().Title("Include CI/CD Pipeline? (GitHub Actions)").Value(&cfg.CICD))
 		}
 
-		if len(fields) > 0 {
-			form := huh.NewForm(huh.NewGroup(fields...))
-			if err := form.Run(); err != nil {
-				return fmt.Errorf("form cancelled: %w", err)
-			}
+		if err := huh.NewForm(huh.NewGroup(fields...)).Run(); err != nil {
+			return fmt.Errorf("form cancelled: %w", err)
 		}
-
-		cfg.Frontend = config.FrontendType(frontendStr)
-		cfg.Backend = config.BackendType(backendStr)
-		cfg.Database = config.DatabaseType(databaseStr)
-		cfg.Cache = config.CacheType(cacheStr)
+		cfg.Frontend = config.FrontendType(frontend)
+		cfg.Backend = config.BackendType(backend)
+		cfg.Database = config.DatabaseType(database)
+		cfg.Cache = config.CacheType(cache)
 	}
 
 	if err := cfg.Validate(); err != nil {
 		return err
 	}
-
 	outputDir, _ := cmd.Flags().GetString("output-dir")
 	dryRun, _ := cmd.Flags().GetBool("dry-run")
 	return runInitLogic(cmd.Context(), cfg, outputDir, dryRun, cmd.OutOrStdout(), app.FS, app.Gen)
 }
 
 func runInitLogic(ctx context.Context, cfg config.ProjectConfig, outputDir string, dryRun bool, output io.Writer, fileSystem fs.FileSystem, gen generator.Generator) error {
-	fmt.Printf("\n✨ Generating environment for: Frontend=%s, Backend=%s, Database=%s\n", cfg.Frontend, cfg.Backend, cfg.Database)
+	fmt.Fprintf(output, "Generating environment: frontend=%s backend=%s database=%s cache=%s\n", cfg.Frontend, cfg.Backend, cfg.Database, cfg.Cache)
 
-	// Resolve ports and passwords
 	data, err := generator.ResolveComposeData(cfg)
 	if err != nil {
 		return fmt.Errorf("resolving configuration: %w", err)
 	}
-
 	filesToWrite := make(map[string]generator.FileDef)
 
-	// Generate docker-compose.yml
+	projectConfig, err := config.RenderProjectFile(cfg)
+	if err != nil {
+		return err
+	}
+	filesToWrite["dev-box.yaml"] = generator.FileDef{Content: projectConfig, Perm: 0644}
+
 	composeContent, err := generator.RenderCompose(data)
 	if err != nil {
 		return fmt.Errorf("rendering compose: %w", err)
 	}
 	filesToWrite["docker-compose.yml"] = generator.FileDef{Content: composeContent, Perm: 0644}
 
-	// Generate .env and .gitignore if needed
-	needsEnv := (cfg.Database != "none" && cfg.Database != "") || cfg.Monitoring || (cfg.Backend != "none" && cfg.Backend != "")
+	needsEnv := cfg.Database != config.DatabaseNone || cfg.Monitoring || cfg.Backend != config.BackendNone
 	if needsEnv {
 		if runtime.GOOS == "windows" {
 			fmt.Fprintln(output, "Note: verify the Windows ACL on .env; POSIX mode 0600 does not map directly to NTFS permissions.")
@@ -177,59 +161,54 @@ func runInitLogic(ctx context.Context, cfg config.ProjectConfig, outputDir strin
 			return fmt.Errorf("rendering env.example file: %w", err)
 		}
 		filesToWrite[".env.example"] = generator.FileDef{Content: envExampleContent, Perm: 0644}
-
 		filesToWrite[".gitignore"] = generator.FileDef{Content: generator.RenderGitignore(), Perm: 0644}
 	}
 
-	backendInternalPort := 0
-	if b, ok := registry.SupportedBackends[cfg.Backend]; ok {
-		backendInternalPort = b.InternalPort
+	backendPort := 0
+	if backend, ok := registry.SupportedBackends[cfg.Backend]; ok {
+		backendPort = backend.InternalPort
 	}
-	frontendInternalPort := 0
-	if f, ok := registry.SupportedFrontends[cfg.Frontend]; ok {
-		frontendInternalPort = f.InternalPort
+	frontendPort := 0
+	if frontend, ok := registry.SupportedFrontends[cfg.Frontend]; ok {
+		frontendPort = frontend.InternalPort
 	}
 
-	// Generate nginx config
-	if cfg.Nginx && (cfg.Frontend != "none" || cfg.Backend != "none") {
-		nginxConf, err := generator.GenerateNginxConf(cfg, backendInternalPort, frontendInternalPort)
+	if cfg.Nginx && (cfg.Frontend != config.FrontendNone || cfg.Backend != config.BackendNone) {
+		nginxConf, err := generator.GenerateNginxConf(cfg, backendPort, frontendPort)
 		if err != nil {
 			return fmt.Errorf("generating nginx conf: %w", err)
 		}
 		filesToWrite[filepath.Join("nginx", "nginx.conf")] = generator.FileDef{Content: nginxConf, Perm: 0644}
 	}
 
-	// Generate monitoring configs
 	if cfg.Monitoring {
-		promConfig, err := generator.RenderPrometheusConfig(backendInternalPort)
+		prometheus, err := generator.RenderPrometheusConfig(backendPort)
 		if err != nil {
-			return err
+			return fmt.Errorf("rendering Prometheus config: %w", err)
 		}
-		filesToWrite[filepath.Join("monitoring", "prometheus.yml")] = generator.FileDef{Content: promConfig, Perm: 0644}
+		filesToWrite[filepath.Join("monitoring", "prometheus.yml")] = generator.FileDef{Content: prometheus, Perm: 0644}
 
-		grafanaDatasource, err := generator.RenderGrafanaDatasource()
+		datasource, err := generator.RenderGrafanaDatasource()
 		if err != nil {
-			return err
+			return fmt.Errorf("rendering Grafana datasource: %w", err)
 		}
-		filesToWrite[filepath.Join("monitoring", "grafana", "provisioning", "datasources", "prometheus.yml")] = generator.FileDef{Content: grafanaDatasource, Perm: 0644}
+		filesToWrite[filepath.Join("monitoring", "grafana", "provisioning", "datasources", "prometheus.yml")] = generator.FileDef{Content: datasource, Perm: 0644}
 
-		promtailConfig, err := generator.RenderPromtailConfig()
+		promtail, err := generator.RenderPromtailConfig()
 		if err != nil {
-			return err
+			return fmt.Errorf("rendering Promtail config: %w", err)
 		}
-		filesToWrite[filepath.Join("monitoring", "promtail-config.yml")] = generator.FileDef{Content: promtailConfig, Perm: 0644}
+		filesToWrite[filepath.Join("monitoring", "promtail-config.yml")] = generator.FileDef{Content: promtail, Perm: 0644}
 	}
 
-	// Generate CI/CD
 	if cfg.CICD {
-		cicdContent, err := generator.GenerateCICD(cfg, backendInternalPort, frontendInternalPort)
+		workflow, err := generator.GenerateCICD(cfg, backendPort, frontendPort)
 		if err != nil {
-			return err
+			return fmt.Errorf("generating CI workflow: %w", err)
 		}
-		filesToWrite[filepath.Join(".github", "workflows", "ci.yml")] = generator.FileDef{Content: cicdContent, Perm: 0644}
+		filesToWrite[filepath.Join(".github", "workflows", "ci.yml")] = generator.FileDef{Content: workflow, Perm: 0644}
 	}
 
-	// Generate scaffold files
 	scaffoldFiles, err := gen.GenerateScaffold(cfg)
 	if err != nil {
 		return fmt.Errorf("generating scaffold: %w", err)
@@ -238,48 +217,19 @@ func runInitLogic(ctx context.Context, cfg config.ProjectConfig, outputDir strin
 		filesToWrite[path] = content
 	}
 
-	var existingFiles []string
-	for path := range filesToWrite {
-		target := generatedTargetPath(outputDir, path)
-		if fileSystem.Exists(target) {
-			existingFiles = append(existingFiles, target)
-		}
-	}
-
-	if len(existingFiles) > 0 && !cfg.Force && !dryRun {
-		fmt.Fprintf(output, "Existing files would be overwritten:\n  %s\n", strings.Join(existingFiles, "\n  "))
-		isTerminal := term.IsTerminal(int(os.Stdin.Fd()))
-		if !isTerminal {
-			return fmt.Errorf("non-interactive environment detected and existing files found; use --force to overwrite")
-		}
-
-		var overwrite bool
-		err := huh.NewConfirm().
-			Title("Existing files found. Overwrite? [y/N]").
-			Value(&overwrite).
-			Run()
-		if err != nil {
-			return fmt.Errorf("prompt cancelled: %w", err)
-		}
-		if !overwrite {
-			fmt.Println("❌ File generation aborted.")
-			return nil
-		}
-	}
-
-	if err := writeGeneratedFiles(ctx, fileSystem, outputDir, filesToWrite, true, dryRun, output); err != nil {
+	if err := writeGeneratedFiles(ctx, fileSystem, outputDir, filesToWrite, cfg.Force, dryRun, output); err != nil {
 		return err
 	}
 	if dryRun {
 		return nil
 	}
 
-	fmt.Println("✅ Successfully generated local environment configuration!")
+	fmt.Fprintln(output, "Successfully generated local environment configuration.")
 	if needsEnv {
-		fmt.Println("🔒 A secure .env file was generated and added to .gitignore.")
+		fmt.Fprintln(output, "A secure .env file was generated and added to .gitignore.")
 	}
 	if cfg.CICD {
-		fmt.Println("✅ Generated .github/workflows/ci.yml")
+		fmt.Fprintln(output, "Generated .github/workflows/ci.yml.")
 	}
 	return nil
 }

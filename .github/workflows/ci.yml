@@ -54,6 +54,24 @@ jobs:
         working-directory: ${{ runner.temp }}/generated
         run: docker compose config --quiet
 
+  declarative-config:
+    name: Replay declarative project configuration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Generate initial project
+        run: go run . init --frontend=react --backend=node --database=postgres --cache=redis --nginx --monitoring --cicd --force --output-dir "$RUNNER_TEMP/initial"
+      - name: Replay from dev-box.yaml
+        run: go run . init --config "$RUNNER_TEMP/initial/dev-box.yaml" --force --output-dir "$RUNNER_TEMP/replayed"
+      - name: Verify stable configuration
+        run: diff -u "$RUNNER_TEMP/initial/dev-box.yaml" "$RUNNER_TEMP/replayed/dev-box.yaml"
+      - name: Validate replayed Compose
+        working-directory: ${{ runner.temp }}/replayed
+        run: docker compose config --quiet
+
   generated-kubernetes:
     name: Validate generated Kubernetes
     runs-on: ubuntu-latest
@@ -62,46 +80,82 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - name: Generate manifests
-        run: go run . k8s --frontend=react --backend=go --database=postgres --cache=redis --force --output-dir "$RUNNER_TEMP/k8s"
+      - name: Generate project configuration
+        run: go run . init --frontend=react --backend=go --database=postgres --cache=redis --force --output-dir "$RUNNER_TEMP/generated"
+      - name: Generate manifests from project configuration
+        run: go run . k8s --config "$RUNNER_TEMP/generated/dev-box.yaml" --force --output-dir "$RUNNER_TEMP/k8s"
       - name: Validate schemas
         run: docker run --rm -v "$RUNNER_TEMP/k8s:/manifests:ro" ghcr.io/yannh/kubeconform:v0.7.0 -strict -summary /manifests
 
-  generated-images:
-    name: Build and run generated images as non-root
+  generated-frontend-image:
+    name: Build and run generated frontend image
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - name: Generate application images
-        run: go run . init --frontend=react --backend=go --database=none --cache=none --force --output-dir "$RUNNER_TEMP/generated"
-      - name: Build images
+      - name: Generate frontend image
+        run: go run . init --frontend=react --backend=none --database=none --cache=none --force --output-dir "$RUNNER_TEMP/generated"
+      - name: Build and verify image user
         run: |
           docker build -t dev-box-ci-frontend "$RUNNER_TEMP/generated/frontend"
-          docker build -t dev-box-ci-api "$RUNNER_TEMP/generated/backend"
-      - name: Verify configured users
-        run: |
           test "$(docker image inspect dev-box-ci-frontend --format '{{.Config.User}}')" = "101:101"
-          test "$(docker image inspect dev-box-ci-api --format '{{.Config.User}}')" = "10001:10001"
-      - name: Run and verify health endpoints
+      - name: Run and verify frontend
         run: |
           docker run -d --name dev-box-ci-frontend -p 127.0.0.1::8080 dev-box-ci-frontend
-          docker run -d --name dev-box-ci-api -p 127.0.0.1::8080 dev-box-ci-api
           FRONTEND_PORT=$(docker port dev-box-ci-frontend 8080/tcp | awk -F: '{print $NF}')
-          API_PORT=$(docker port dev-box-ci-api 8080/tcp | awk -F: '{print $NF}')
           for i in $(seq 1 30); do
-            curl -fsS "http://127.0.0.1:${FRONTEND_PORT}/" >/dev/null && \
-              curl -fsS "http://127.0.0.1:${API_PORT}/health" >/dev/null && exit 0
+            curl -fsS "http://127.0.0.1:${FRONTEND_PORT}/" >/dev/null && exit 0
             sleep 2
           done
           docker logs dev-box-ci-frontend
-          docker logs dev-box-ci-api
           exit 1
       - name: Clean up containers
         if: always()
-        run: docker rm -f dev-box-ci-frontend dev-box-ci-api || true
+        run: docker rm -f dev-box-ci-frontend || true
+
+  generated-backend-images:
+    name: Build and run generated backend (${{ matrix.backend }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - backend: node
+            user: "10001:10001"
+          - backend: python
+            user: "10001:10001"
+          - backend: go
+            user: "10001:10001"
+          - backend: php
+            user: "www-data"
+          - backend: java
+            user: "10001:10001"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Generate backend image
+        run: go run . init --frontend=none --backend=${{ matrix.backend }} --database=none --cache=none --force --output-dir "$RUNNER_TEMP/generated"
+      - name: Build and verify image user
+        run: |
+          docker build -t dev-box-ci-api "$RUNNER_TEMP/generated/backend"
+          test "$(docker image inspect dev-box-ci-api --format '{{.Config.User}}')" = "${{ matrix.user }}"
+      - name: Run and verify API
+        run: |
+          docker run -d --name dev-box-ci-api -p 127.0.0.1::8080 dev-box-ci-api
+          API_PORT=$(docker port dev-box-ci-api 8080/tcp | awk -F: '{print $NF}')
+          for i in $(seq 1 30); do
+            curl -fsS "http://127.0.0.1:${API_PORT}/health" >/dev/null && exit 0
+            sleep 2
+          done
+          docker logs dev-box-ci-api
+          exit 1
+      - name: Clean up container
+        if: always()
+        run: docker rm -f dev-box-ci-api || true
 
   generated-terraform:
     name: Validate generated Terraform (${{ matrix.provider }})

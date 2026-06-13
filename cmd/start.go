@@ -18,25 +18,20 @@ var startCmd = &cobra.Command{
 			return err
 		}
 
-		fmt.Println("🚀 Starting the development environment...")
-
-		c := exec.CommandContext(cmd.Context(), dockerCmd, "compose", "up", "-d")
-		c.Stdout = os.Stdout
-		c.Stderr = os.Stderr
-
-		if err := c.Run(); err != nil {
+		fmt.Println("Starting the development environment...")
+		start := exec.CommandContext(cmd.Context(), dockerCmd, "compose", "up", "-d")
+		start.Stdout = os.Stdout
+		start.Stderr = os.Stderr
+		if err := start.Run(); err != nil {
 			return fmt.Errorf("starting containers: %w", err)
 		}
 
-		fmt.Println("✅ Environment is up and running!")
-		fmt.Println("📡 Assigned Ports:")
-
-		// Run `docker compose ps` to show the dynamically allocated ports
-		psCmd := exec.CommandContext(cmd.Context(), dockerCmd, "compose", "ps")
-		psCmd.Stdout = os.Stdout
-		psCmd.Stderr = os.Stderr
-		_ = psCmd.Run()
-
+		fmt.Println("Environment is up and running.")
+		fmt.Println("Assigned ports:")
+		status := exec.CommandContext(cmd.Context(), dockerCmd, "compose", "ps")
+		status.Stdout = os.Stdout
+		status.Stderr = os.Stderr
+		_ = status.Run()
 		return nil
 	},
 }

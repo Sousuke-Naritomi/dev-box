@@ -27,6 +27,7 @@ Docker Compose、フロントエンドとバックエンドの最小実装、Kub
 
 - 対話式ウィザードによる技術スタック選択
 - フラグを使用した非対話生成
+- `dev-box.yaml`を使用した宣言的で再現可能な生成
 - Docker Compose とアプリケーションコードの同時生成
 - Docker または Podman を使用した起動、停止、状態確認、ログ表示
 - React/Vue の本番ビルド用 Dockerfile 生成
@@ -159,6 +160,19 @@ dev-box init \
   --output-dir ./my-app
 ```
 
+生成された`dev-box.yaml`を使用すれば、同じ構成を別ディレクトリへ再生成できます。
+
+```bash
+dev-box init --config ./my-app/dev-box.yaml --output-dir ./my-app-replayed
+dev-box k8s --config ./my-app/dev-box.yaml --output-dir ./k8s-manifests
+```
+
+CLIで明示したフラグは設定ファイルより優先されます。
+
+```bash
+dev-box init --config dev-box.yaml --backend python --monitoring=false
+```
+
 ホスト側ポートは自動割り当てされ、`127.0.0.1` のみに公開されます。接続先は次のコマンドで確認します。
 
 ```bash
@@ -185,6 +199,7 @@ Docker Compose、環境変数、アプリケーションコード、任意の監
 --localstack         LocalStackを追加
 --monitoring         Prometheus、Grafana、Loki、Promtailを追加
 --cicd               GitHub Actionsを追加
+--config string      dev-box.yamlのパス
 --force              確認せず既存ファイルを上書き
 --dry-run            ファイルを書き込まず生成内容を標準出力へ表示
 --output-dir string  出力先ディレクトリ（既定値: .）
@@ -240,11 +255,18 @@ dev-box k8s \
   --output-dir ./k8s-manifests
 ```
 
+`init`が生成した設定をそのまま利用する場合:
+
+```bash
+dev-box k8s --config ./dev-box.yaml
+```
+
 利用可能な共通フラグ:
 
 ```text
 --force
 --dry-run
+--config string
 --output-dir string  既定値: k8s-manifests
 ```
 
@@ -278,6 +300,7 @@ template schema 1
 
 ```text
 my-app/
+|-- dev-box.yaml
 |-- docker-compose.yml
 |-- .env
 |-- .env.example
@@ -302,6 +325,28 @@ my-app/
 ```
 
 選択していないコンポーネントのファイルやサービスは生成されません。
+
+### `dev-box.yaml`
+
+`init`は解決済みの構成を、バージョン付きの設定ファイルとして保存します。
+
+```yaml
+version: 1
+frontend: react
+backend: go
+database: postgres
+cache: redis
+nginx: true
+localstack: false
+monitoring: true
+cicd: true
+```
+
+- 未知のキーはエラーとして拒否
+- 未対応の設定バージョンは拒否
+- `--force`など実行時だけのオプションは保存しない
+- CLIフラグで一部だけ上書き可能
+- ComposeとKubernetesを同じ構成から再生成可能
 
 ### Docker Compose の仕様
 
@@ -349,6 +394,7 @@ PromtailのホストログマウントはLinuxを前提としています。Dock
 - 更新前のファイルを一時バックアップし、途中失敗時にロールバック
 - 最終ファイルへ指定された権限を再適用
 - `.gitignore`は置換せず、未登録行のみ追加
+- 解決済み構成を`dev-box.yaml`として保存
 - Ctrl+CなどのキャンセルをContext経由で処理
 
 既存ファイルを上書きする場合は、事前にGitへコミットすることを推奨します。
@@ -470,8 +516,9 @@ terraform apply
 - `go test -race`
 - `golangci-lint`
 - 複数スタックの`docker compose config`
+- `dev-box.yaml`からの再生成と構成の安定性
 - Kubernetes YAMLの`kubeconform`
-- 代表構成のDocker image build、非rootユーザー、HTTP health check
+- frontendと全バックエンドのDocker image build、非rootユーザー、HTTP health check
 - AWS/GCP/Azureの`terraform fmt`、`init`、`validate`
 - TrivyによるTerraform構成スキャン
 
@@ -533,7 +580,6 @@ dev-box/
 - Composeのホスト側ポートは固定されません。起動後に`status`または`docker compose port`で確認してください。
 - Composeは開発用のbase imageとbind mountを使用します。生成Dockerfileは主に本番イメージ/Kubernetes向けです。
 - Kubernetesのfrontend/APIイメージ名は`dev-box-frontend:latest`と`dev-box-api:latest`です。利用者がビルド、配布、タグ管理を行う必要があります。
-- 現行実装ではNode.js/PythonのDockerfileは8080で待ち受けますが、KubernetesジェネレーターのService/Probeはそれぞれ3000/8000を使用します。Node.js/PythonをKubernetesへ配置する場合は生成後に`api.yaml`を8080へ合わせてください。
 - KubernetesのDatabaseはStatefulSetではなくDeploymentとPVCです。本番データベース用途ではマネージドサービスや専用Operatorを検討してください。
 - Kubernetesの`db-secret`は自動生成されません。
 - frontend用NetworkPolicyには`0.0.0.0/0`からのIngress許可が含まれます。非公開構成では削除またはCIDR制限してください。

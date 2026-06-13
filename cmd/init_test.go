@@ -74,6 +74,7 @@ func TestInitCmd_E2E(t *testing.T) {
 	}
 
 	expectedFiles := []string{
+		"dev-box.yaml",
 		"docker-compose.yml",
 		".env",
 		".gitignore",

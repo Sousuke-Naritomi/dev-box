@@ -1,0 +1,9 @@
+version: 1
+frontend: react
+backend: go
+database: postgres
+cache: redis
+nginx: false
+localstack: false
+monitoring: false
+cicd: false

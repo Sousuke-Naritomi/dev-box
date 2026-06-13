@@ -18,17 +18,15 @@ var stopCmd = &cobra.Command{
 			return err
 		}
 
-		fmt.Println("🛑 Stopping the development environment...")
-
-		c := exec.CommandContext(cmd.Context(), dockerCmd, "compose", "down")
-		c.Stdout = os.Stdout
-		c.Stderr = os.Stderr
-
-		if err := c.Run(); err != nil {
+		fmt.Println("Stopping the development environment...")
+		stop := exec.CommandContext(cmd.Context(), dockerCmd, "compose", "down")
+		stop.Stdout = os.Stdout
+		stop.Stderr = os.Stderr
+		if err := stop.Run(); err != nil {
 			return fmt.Errorf("stopping containers: %w", err)
 		}
 
-		fmt.Println("✅ Environment has been stopped.")
+		fmt.Println("Environment has been stopped.")
 		return nil
 	},
 }

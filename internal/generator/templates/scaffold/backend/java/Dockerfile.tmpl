@@ -8,4 +8,5 @@ RUN groupadd --gid 10001 app && useradd --uid 10001 --gid app --no-create-home a
 WORKDIR /app
 COPY --from=build --chown=app:app /app/Main.class .
 USER 10001:10001
+EXPOSE 8080
 CMD ["java", "Main"]

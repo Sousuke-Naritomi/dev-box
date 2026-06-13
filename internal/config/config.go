@@ -32,19 +32,32 @@ const (
 // ProjectConfig holds all user selections for environment generation.
 // Each field corresponds to a prompt in the interactive setup wizard.
 type ProjectConfig struct {
-	Frontend   FrontendType
-	Backend    BackendType
-	Database   DatabaseType
-	Cache      CacheType
-	Nginx      bool
-	LocalStack bool
-	Monitoring bool
-	CICD       bool
-	Force      bool // Skip overwrite prompts
+	Frontend   FrontendType `yaml:"frontend"`
+	Backend    BackendType  `yaml:"backend"`
+	Database   DatabaseType `yaml:"database"`
+	Cache      CacheType    `yaml:"cache"`
+	Nginx      bool         `yaml:"nginx"`
+	LocalStack bool         `yaml:"localstack"`
+	Monitoring bool         `yaml:"monitoring"`
+	CICD       bool         `yaml:"cicd"`
+	Force      bool         `yaml:"-"` // Skip overwrite prompts; never persisted.
 }
 
 // Validate checks if the configuration values are valid.
 func (c *ProjectConfig) Validate() error {
+	if err := c.ValidateSelection(); err != nil {
+		return err
+	}
+
+	if !c.HasWorkload() && !c.LocalStack && !c.Monitoring {
+		return fmt.Errorf("at least one service must be selected")
+	}
+
+	return nil
+}
+
+// ValidateSelection checks the core stack values without considering addons.
+func (c *ProjectConfig) ValidateSelection() error {
 	switch c.Frontend {
 	case FrontendReact, FrontendVue, FrontendNone:
 		// valid
@@ -73,13 +86,14 @@ func (c *ProjectConfig) Validate() error {
 		return fmt.Errorf("unsupported cache: %q", c.Cache)
 	}
 
-	if c.Frontend == FrontendNone &&
-		c.Backend == BackendNone &&
-		c.Database == DatabaseNone &&
-		c.Cache == CacheNone &&
-		!c.LocalStack && !c.Monitoring {
-		return fmt.Errorf("at least one service must be selected")
-	}
-
 	return nil
+}
+
+// HasWorkload reports whether the configuration contains a core application,
+// database, or cache service.
+func (c ProjectConfig) HasWorkload() bool {
+	return c.Frontend != FrontendNone ||
+		c.Backend != BackendNone ||
+		c.Database != DatabaseNone ||
+		c.Cache != CacheNone
 }

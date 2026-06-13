@@ -18,16 +18,13 @@ var statusCmd = &cobra.Command{
 			return err
 		}
 
-		fmt.Println("📊 Checking environment status...")
-
-		c := exec.CommandContext(cmd.Context(), dockerCmd, "compose", "ps")
-		c.Stdout = os.Stdout
-		c.Stderr = os.Stderr
-
-		if err := c.Run(); err != nil {
+		fmt.Println("Checking environment status...")
+		status := exec.CommandContext(cmd.Context(), dockerCmd, "compose", "ps")
+		status.Stdout = os.Stdout
+		status.Stderr = os.Stderr
+		if err := status.Run(); err != nil {
 			return fmt.Errorf("getting status: %w", err)
 		}
-
 		return nil
 	},
 }
