@@ -1,38 +1,43 @@
 # dev-box
 
-`dev-box` は、選択した技術スタックに応じてローカル開発環境のひな形を生成する Go 製 CLI です。
+`dev-box` は、プロジェクトで使いたい技術を選ぶだけで、開発を始めるための環境一式を生成する Go 製 CLI です。
 
-Docker Compose、フロントエンドとバックエンドの最小実装、Kubernetes マニフェスト、Terraform 構成、GitHub Actions ワークフローを生成できます。対話形式とコマンドラインフラグの両方に対応しています。
+フロントエンド、バックエンド、データベース、キャッシュを自由に組み合わせ、Docker Compose、最小構成のアプリケーション、Kubernetes マニフェスト、Terraform、GitHub Actions を同じ設定から生成できます。
+
+## dev-box は何のためのツールか
+
+新しいプロジェクトでは、アプリケーションを書く前に次の準備が必要になります。
+
+- Docker Compose の作成
+- フロントエンドと API の初期構築
+- データベースや Redis の接続設定
+- ヘルスチェックと監視設定
+- Kubernetes やクラウド環境のひな形作成
+- CI のセットアップ
+
+`dev-box` はこれらの定型作業を自動化し、**ローカル開発からデプロイ準備までの一貫した出発点**を作ります。
+
+主な利用場面は次のとおりです。
+
+- 新規 Web アプリケーションの開発環境をすぐに用意したい
+- 複数の技術スタックを比較、検証したい
+- チームで同じ開発環境を再現したい
+- Docker、Kubernetes、Terraform、CI の学習用ベースが欲しい
+- プロジェクト初期構築の手作業と設定漏れを減らしたい
 
 > [!IMPORTANT]
-> 生成物は開発開始時のベースラインです。認証・認可、TLS、DNS、バックアップ、データベースマイグレーション、可用性、コスト管理などを含む完成済みの本番環境ではありません。本番利用前に、生成された設定を対象環境に合わせてレビューしてください。
+> `dev-box` が生成するものは、安全性を考慮した開発開始用のベースラインです。認証・認可、TLS、DNS、バックアップ、データベース移行、可用性設計、クラウド費用管理まで完了した本番環境ではありません。本番利用前に、生成物を対象環境に合わせてレビューしてください。
 
-## 目次
+## できること
 
-- [主な機能](#主な機能)
-- [対応スタック](#対応スタック)
-- [動作要件](#動作要件)
-- [インストール](#インストール)
-- [クイックスタート](#クイックスタート)
-- [コマンド](#コマンド)
-- [生成されるローカル開発環境](#生成されるローカル開発環境)
-- [ファイル生成の安全性](#ファイル生成の安全性)
-- [Kubernetes](#kubernetes)
-- [Terraform](#terraform)
-- [CI](#ci)
-- [開発](#開発)
-- [既知の制約](#既知の制約)
-
-## 主な機能
-
-- 対話式ウィザードによる技術スタック選択
-- フラグを使用した非対話生成
-- `dev-box.yaml`を使用した宣言的で再現可能な生成
+- 対話式ウィザードで技術スタックを選択
+- CLI フラグによる非対話生成
+- `dev-box.yaml` による宣言的で再現可能な構成管理
 - Docker Compose とアプリケーションコードの同時生成
-- Docker または Podman を使用した起動、停止、状態確認、ログ表示
-- React/Vue の本番ビルド用 Dockerfile 生成
-- Node.js/Python/Go/PHP/Java の API サンプルと Dockerfile 生成
-- MySQL/PostgreSQL、Redis、Nginx、LocalStack の任意追加
+- Docker または Podman による起動、停止、状態確認、ログ表示
+- React/Vue の開発環境と本番ビルド用 Dockerfile の生成
+- Node.js/Python/Go/PHP/Java の API と Dockerfile の生成
+- MySQL/PostgreSQL、Redis、Nginx、LocalStack の追加
 - Prometheus、Grafana、Loki、Promtail の監視構成生成
 - Kubernetes の Deployment、Service、PVC、NetworkPolicy 生成
 - AWS、GCP、Azure 向け Terraform 構成生成
@@ -43,7 +48,7 @@ Docker Compose、フロントエンドとバックエンドの最小実装、Kub
 
 ### アプリケーション
 
-| 種別 | 選択値 | 開発時のポート | 生成 Dockerfile のポート |
+| 種別 | 選択値 | 開発時のコンテナポート | 生成イメージのポート |
 |---|---|---:|---:|
 | Frontend | React + Vite | 5173 | 8080 |
 | Frontend | Vue + Vite | 5173 | 8080 |
@@ -53,17 +58,17 @@ Docker Compose、フロントエンドとバックエンドの最小実装、Kub
 | Backend | PHP + Apache | 80 | 8080 |
 | Backend | Java + `HttpServer` | 8080 | 8080 |
 
-フロントエンドとバックエンドには `none` を指定できます。
+Frontend と Backend には `none` を指定できます。
 
-すべてのバックエンドサンプルは次のエンドポイントを提供します。
+すべての Backend サンプルは次のエンドポイントを提供します。
 
 | パス | 用途 |
 |---|---|
 | `/` | サンプルレスポンス |
 | `/health` | ヘルスチェック |
-| `/metrics` | Prometheus 形式の最小メトリクス |
+| `/metrics` | Prometheus 形式のメトリクス |
 
-### データストアとアドオン
+### データストアと追加機能
 
 | 種別 | 選択肢 |
 |---|---|
@@ -74,29 +79,23 @@ Docker Compose、フロントエンドとバックエンドの最小実装、Kub
 | Monitoring | Prometheus、Grafana、Loki、Promtail |
 | CI | GitHub Actions |
 
-コンポーネントのバージョンは [`internal/config/versions.go`](internal/config/versions.go) で管理されています。現在はバージョンタグ固定であり、イメージ digest 固定ではありません。
+使用するコンポーネントのバージョンは [`internal/config/versions.go`](internal/config/versions.go) で管理しています。
 
 ## 動作要件
 
-### dev-box のビルド
+### dev-box のインストールまたはビルド
 
 - Go 1.25 以上
 
 ### 生成したローカル環境の実行
 
-- Docker Engine と Docker Compose V2、または Compose 互換の Podman
+- Docker Desktop、または Docker Engine + Docker Compose V2
+- Compose 互換環境として Podman も利用可能
 
-`start`、`stop`、`status`、`logs` は最初に `docker` を検索し、見つからない場合は `podman` を検索します。明示的に指定する場合は `DOCKER_CMD` 環境変数を使用します。
-
-```bash
-DOCKER_CMD=podman dev-box start
-```
-
-### オプション機能
+追加機能を使う場合は次のツールも必要です。
 
 - Kubernetes: `kubectl` と対象クラスタ
-- Terraform: Terraform 1.0 以上、対象クラウドの認証情報
-- コンテナイメージ検証: Docker デーモン
+- Terraform: Terraform 1.0 以上と対象クラウドの認証情報
 
 ## インストール
 
@@ -122,31 +121,59 @@ Set-Location dev-box
 go build -o dev-box.exe .
 ```
 
-バージョン情報は次のコマンドで確認できます。
+インストールを確認します。
 
 ```bash
 dev-box version
+dev-box --help
 ```
-
-リリースビルドでは CLI バージョンが埋め込まれます。通常の `go build` では `dev` と表示されます。
 
 ## クイックスタート
 
-### 対話形式
+### 1. 対話形式で生成する
 
-空の作業ディレクトリで実行します。
+空の作業ディレクトリで `init` を実行すると、使用する技術を順番に選択できます。
 
 ```bash
 mkdir my-app
 cd my-app
 dev-box init
+```
+
+### 2. 開発環境を起動する
+
+```bash
 dev-box start
 dev-box status
 ```
 
-### 非対話形式
+公開ポートは競合を避けるため自動割り当てされ、`127.0.0.1` のみに公開されます。実際のポートは次のコマンドで確認できます。
 
-非対話環境では `frontend`、`backend`、`database`、`cache` をすべて指定してください。
+```bash
+docker compose port frontend 5173
+docker compose port api 8080
+```
+
+選択した Backend によって API のコンテナポートは異なります。`dev-box status` または生成された `docker-compose.yml` でも確認できます。
+
+### 3. ログを確認する
+
+```bash
+dev-box logs
+dev-box logs api
+```
+
+### 4. 環境を停止する
+
+```bash
+dev-box stop
+```
+
+`stop` は名前付きボリュームを削除しないため、データベースなどのデータは保持されます。
+
+## 非対話で生成する
+
+CI やスクリプトから利用する場合は、Core 構成をすべて指定します。
 
 ```bash
 dev-box init \
@@ -160,175 +187,20 @@ dev-box init \
   --output-dir ./my-app
 ```
 
-生成された`dev-box.yaml`を使用すれば、同じ構成を別ディレクトリへ再生成できます。
-
-```bash
-dev-box init --config ./my-app/dev-box.yaml --output-dir ./my-app-replayed
-dev-box k8s --config ./my-app/dev-box.yaml --output-dir ./k8s-manifests
-```
-
-CLIで明示したフラグは設定ファイルより優先されます。
-
-```bash
-dev-box init --config dev-box.yaml --backend python --monitoring=false
-```
-
-ホスト側ポートは自動割り当てされ、`127.0.0.1` のみに公開されます。接続先は次のコマンドで確認します。
-
-```bash
-cd my-app
-dev-box status
-docker compose port frontend 5173
-docker compose port api 8080
-```
-
-バックエンド種別によって API のコンテナポートは異なります。正確な値は生成された `docker-compose.yml` または `docker compose ps` で確認してください。
-
-## コマンド
-
-### `dev-box init`
-
-Docker Compose、環境変数、アプリケーションコード、任意の監視・CI 設定を生成します。
+選択できる値は次のとおりです。
 
 ```text
---frontend string    react | vue | none
---backend string     node | python | go | php | java | none
---database string    mysql | postgres | none
---cache string       redis | none
---nginx              Nginx reverse proxyを追加
---localstack         LocalStackを追加
---monitoring         Prometheus、Grafana、Loki、Promtailを追加
---cicd               GitHub Actionsを追加
---config string      dev-box.yamlのパス
---force              確認せず既存ファイルを上書き
---dry-run            ファイルを書き込まず生成内容を標準出力へ表示
---output-dir string  出力先ディレクトリ（既定値: .）
+frontend: react | vue | none
+backend:  node | python | go | php | java | none
+database: mysql | postgres | none
+cache:    redis | none
 ```
 
-サービスが1つも存在しない構成は拒否されます。LocalStackまたはMonitoringだけを選択した構成は生成できます。
+すべてが `none` で、LocalStack と Monitoring も無効な空構成は拒否されます。また、Nginx を使用する場合は Frontend または Backend が必要です。
 
-### `dev-box start`
+## 設定ファイル
 
-カレントディレクトリで `docker compose up -d` または `podman compose up -d` を実行します。
-
-```bash
-dev-box start
-```
-
-### `dev-box stop`
-
-`compose down` を実行します。`-v` は付与しないため、名前付きボリュームは保持されます。
-
-```bash
-dev-box stop
-```
-
-### `dev-box status`
-
-`compose ps` を実行し、コンテナ状態と割り当て済みポートを表示します。
-
-```bash
-dev-box status
-```
-
-### `dev-box logs [service]`
-
-全サービスまたは指定した1サービスのログを追跡表示します。
-
-```bash
-dev-box logs
-dev-box logs api
-```
-
-サービス名は最大1件指定できます。
-
-### `dev-box k8s`
-
-選択した構成に対応する Kubernetes マニフェストを生成します。
-
-```bash
-dev-box k8s \
-  --frontend react \
-  --backend go \
-  --database postgres \
-  --cache redis \
-  --output-dir ./k8s-manifests
-```
-
-`init`が生成した設定をそのまま利用する場合:
-
-```bash
-dev-box k8s --config ./dev-box.yaml
-```
-
-利用可能な共通フラグ:
-
-```text
---force
---dry-run
---config string
---output-dir string  既定値: k8s-manifests
-```
-
-### `dev-box deploy`
-
-AWS、GCP、Azure のいずれかに対応する Terraform ファイルを生成します。
-
-```bash
-dev-box deploy --provider aws --output-dir ./terraform
-```
-
-```text
---provider string    aws | gcp | azure
---force
---dry-run
---output-dir string  既定値: terraform
-```
-
-### `dev-box version`
-
-CLI とテンプレートスキーマのバージョンを表示します。
-
-```text
-dev-box <version>
-template schema 1
-```
-
-## 生成されるローカル開発環境
-
-構成に応じて次のファイルが生成されます。
-
-```text
-my-app/
-|-- dev-box.yaml
-|-- docker-compose.yml
-|-- .env
-|-- .env.example
-|-- .gitignore
-|-- frontend/
-|   |-- Dockerfile
-|   |-- .dockerignore
-|   |-- package.json
-|   |-- package-lock.json
-|   `-- src/
-|-- backend/
-|   |-- Dockerfile
-|   |-- .dockerignore
-|   `-- ...
-|-- nginx/
-|   `-- nginx.conf
-|-- monitoring/
-|   |-- prometheus.yml
-|   |-- promtail-config.yml
-|   `-- grafana/provisioning/datasources/prometheus.yml
-`-- .github/workflows/ci.yml
-```
-
-選択していないコンポーネントのファイルやサービスは生成されません。
-
-### `dev-box.yaml`
-
-`init`は解決済みの構成を、バージョン付きの設定ファイルとして保存します。
+`init` は選択内容を `dev-box.yaml` に保存します。
 
 ```yaml
 version: 1
@@ -342,114 +214,141 @@ monitoring: true
 cicd: true
 ```
 
-- 未知のキーはエラーとして拒否
-- 未対応の設定バージョンは拒否
-- `--force`など実行時だけのオプションは保存しない
-- CLIフラグで一部だけ上書き可能
-- ComposeとKubernetesを同じ構成から再生成可能
+このファイルから同じ環境を再生成できます。
 
-### Docker Compose の仕様
+```bash
+dev-box init --config ./my-app/dev-box.yaml --output-dir ./my-app-copy
+dev-box k8s --config ./my-app/dev-box.yaml --output-dir ./k8s-manifests
+```
 
-- すべての公開ポートを `127.0.0.1:0:<container-port>` 形式でバインド
-- ホスト側ポートを Compose によって動的割り当て
-- アプリケーションコードを bind mount し、開発用サーバーを起動
-- Node.js は `npm ci` を使用
-- DB、Redis にヘルスチェックを設定
-- DB、Node.js、Go、LocalStack、監視データに名前付きボリュームを使用
-- MySQL/PostgreSQL、Grafana の秘密情報を `.env` から読み込み
-- Nginx、LocalStack、監視サービスも localhost のみに公開
+CLI で明示したフラグは設定ファイルより優先されます。
 
-生成 Dockerfile は Compose の開発起動とは別用途です。React/Vue は Vite でビルドした静的ファイルを `nginx-unprivileged` で配信し、GoとJavaはマルチステージビルドを使用します。
+```bash
+dev-box init --config dev-box.yaml --backend python --monitoring=false
+```
+
+未知のキー、未対応のバージョン、不正な選択値はエラーとして拒否されます。`--force` や `--dry-run` など実行時だけの設定は保存されません。
+
+## コマンド一覧
+
+| コマンド | 内容 |
+|---|---|
+| `dev-box init` | Compose、アプリケーション、環境変数、監視、CI を生成 |
+| `dev-box start` | Compose サービスをバックグラウンド起動 |
+| `dev-box stop` | Compose サービスを停止 |
+| `dev-box status` | コンテナ状態と公開ポートを表示 |
+| `dev-box logs [service]` | 全体または1サービスのログを追跡 |
+| `dev-box k8s` | Kubernetes マニフェストを生成 |
+| `dev-box deploy` | Terraform ファイルを生成 |
+| `dev-box version` | CLI とテンプレートスキーマのバージョンを表示 |
+
+### `init` の主なオプション
+
+```text
+--frontend string
+--backend string
+--database string
+--cache string
+--nginx
+--localstack
+--monitoring
+--cicd
+--config string
+--force
+--dry-run
+--output-dir string  既定値: .
+```
+
+### 共通の生成オプション
+
+- `--dry-run`: ファイルを書き込まず、生成予定の内容を表示
+- `--output-dir`: 生成先ディレクトリを指定
+- `--force`: 確認せず既存ファイルを上書き
+
+既存ファイルがある場合、通常は上書き対象を表示して確認します。非対話環境では `--force` がなければ処理を中止します。
+
+## 生成されるファイル
+
+選択内容に応じて、必要なものだけが生成されます。
+
+```text
+my-app/
+|-- dev-box.yaml
+|-- docker-compose.yml
+|-- .env
+|-- .env.example
+|-- .gitignore
+|-- frontend/
+|   |-- Dockerfile
+|   |-- .dockerignore
+|   |-- package.json
+|   `-- src/
+|-- backend/
+|   |-- Dockerfile
+|   |-- .dockerignore
+|   `-- ...
+|-- nginx/
+|   `-- nginx.conf
+|-- monitoring/
+|   |-- prometheus.yml
+|   |-- promtail-config.yml
+|   `-- grafana/provisioning/
+`-- .github/workflows/ci.yml
+```
+
+### Docker Compose
+
+- ソースコードを bind mount して開発サーバーを起動
+- 公開ポートを `127.0.0.1` に限定
+- ホスト側ポートを動的割り当て
+- DB と Redis にヘルスチェックを設定
+- 永続データに名前付きボリュームを使用
+- パスワードなどを `.env` から読み込み
+- Node.js の依存関係は `npm ci` でインストール
+
+生成される Dockerfile は、Compose の開発用起動とは別に、本番寄りのコンテナイメージを作成するためのものです。アプリケーションコンテナは原則として非 root ユーザーで動作します。
 
 ### 秘密情報
 
-データベースとGrafanaを選択した場合、暗号学的乱数を使用してパスワードを生成します。
+Database または Grafana を選択すると、安全な乱数からパスワードを生成します。
 
-- `.env`: 実際の秘密情報。可能な環境では `0600` で作成
-- `.env.example`: プレースホルダー化した共有用設定
-- `.gitignore`: 既存内容を保持したまま必要項目を追記
+- `.env`: 実際の秘密情報。対応環境では権限 `0600` で作成
+- `.env.example`: 共有可能なプレースホルダー
+- `.gitignore`: 既存内容を維持したまま必要な行だけを追加
 
-WindowsではPOSIXファイルモードがNTFS ACLへ直接対応しないため、`.env`のアクセス権を別途確認してください。
-
-### 監視
-
-`--monitoring` を指定すると次を生成します。
-
-- Prometheus自身とAPIの`/metrics`を収集する設定
-- GrafanaへPrometheusを自動登録するdatasource provisioning
-- LokiとPromtailによる`/var/log/*.log`の収集設定
-
-PromtailのホストログマウントはLinuxを前提としています。Docker Desktopでは取得できるログ範囲が異なります。
-
-## ファイル生成の安全性
-
-`init`、`k8s`、`deploy`は共通の安全な書き込み処理を使用します。
-
-- 上書き対象を事前に一覧表示
-- 対話端末では上書き確認を実施
-- 非対話環境で既存ファイルがある場合は`--force`なしでは失敗
-- `--dry-run`で書き込み前に内容を確認可能
-- シンボリックリンクへの上書きを拒否
-- 同一ディレクトリ内の一時ファイルへ書き込み後にrename
-- 更新前のファイルを一時バックアップし、途中失敗時にロールバック
-- 最終ファイルへ指定された権限を再適用
-- `.gitignore`は置換せず、未登録行のみ追加
-- 解決済み構成を`dev-box.yaml`として保存
-- Ctrl+CなどのキャンセルをContext経由で処理
-
-既存ファイルを上書きする場合は、事前にGitへコミットすることを推奨します。
+Windows では POSIX ファイルモードと NTFS ACL が同一ではないため、必要に応じて `.env` のアクセス権を確認してください。
 
 ## Kubernetes
 
-### 生成物
+同じ Core 構成から Kubernetes マニフェストを生成できます。
+
+```bash
+dev-box k8s --config ./dev-box.yaml --output-dir ./k8s-manifests
+```
+
+主な生成物:
 
 ```text
 k8s-manifests/
 |-- namespace.yaml
 |-- networkpolicy.yaml
-|-- frontend.yaml  # frontend選択時
-|-- api.yaml       # backend選択時
-|-- db.yaml        # database選択時
-`-- cache.yaml     # redis選択時
+|-- frontend.yaml
+|-- api.yaml
+|-- db.yaml
+`-- cache.yaml
 ```
 
-生成されるリソース:
-
-- Namespace: `dev-box-ns`
-- Application: Deployment、Service、readiness/liveness probe
-- Frontend Service: `LoadBalancer`
-- API Service: `ClusterIP`
-- Database: Deployment、ClusterIP Service、1 GiB PVC
-- Redis: Deployment、ClusterIP Service
-- 構成に応じて生成されるNetworkPolicy
-
-### セキュリティ設定
-
-フロントエンド、API、Redisには次の設定を生成します。
+選択したサービスに応じて Deployment、Service、PVC、probe、resource limits、NetworkPolicy を生成します。Frontend、API、Redis には次のセキュリティ設定が含まれます。
 
 - `runAsNonRoot: true`
-- 固定UIDによる`runAsUser`
+- 固定 `runAsUser`
 - `allowPrivilegeEscalation: false`
-- Linux capabilityの全削除
+- Linux capability の全削除
 - `seccompProfile.type: RuntimeDefault`
-- CPU/メモリのrequestsとlimits
 
-MySQL/PostgreSQLは公式イメージの起動要件を優先しており、同じ固定UID設定は適用していません。
+NetworkPolicy は DNS、Frontend から API、API から DB/Redis など、構成上必要な通信のみを追加します。
 
-NetworkPolicyはデフォルトでIngress/Egressを拒否し、DNS、frontendからAPI、APIからDB/Redisへの必要な通信を追加します。frontendを選択した場合はIngress Controller名前空間および外部IPからfrontendへの通信を許可します。クラスタのCNI、DNSラベル、Ingress Controller名前空間に合わせて調整してください。
-
-### 適用手順
-
-アプリケーション用イメージをビルドし、クラスタから取得可能なレジストリへpushするか、ローカルクラスタへloadします。
-
-```bash
-docker build -t dev-box-frontend:latest ./frontend
-docker build -t dev-box-api:latest ./backend
-```
-
-必要に応じて`frontend.yaml`と`api.yaml`のイメージ名を変更します。
-
-データベースを選択した場合は、マニフェスト適用前にSecretを作成します。
+アプリケーションイメージは利用者がビルドし、クラスタから取得可能なレジストリへ push するか、ローカルクラスタへ loadしてください。Database を選択した場合は適用前に `db-secret` も作成します。
 
 ```bash
 kubectl apply -f k8s-manifests/namespace.yaml
@@ -460,7 +359,11 @@ kubectl apply -f k8s-manifests/
 
 ## Terraform
 
-`deploy`は選択したプロバイダ向けに次を生成します。
+AWS、GCP、Azure の VM と基本ネットワークを作成する Terraform を生成できます。
+
+```bash
+dev-box deploy --provider aws --output-dir ./terraform
+```
 
 ```text
 terraform/
@@ -469,34 +372,21 @@ terraform/
 `-- terraform.tfvars.example
 ```
 
-### 共通方針
+### セキュリティ方針
 
-- SSH許可CIDRの既定値は空
-- HTTP/HTTPS公開は既定で無効
-- AWS/GCPのPublic IPは既定で無効
-- AWSのoutbound CIDRは既定で空
-- `terraform.tfvars.example`には置換用のサンプルCIDRを記載
-- VM起動時にDocker EngineとCompose pluginをインストール
+- SSH 許可 CIDR の既定値は空
+- HTTP/HTTPS 公開は既定で無効
+- AWS/GCP の Public IP は既定で無効
+- AWS の outbound CIDR は既定で空
+- AWS IMDSv2 と暗号化 root disk を使用
+- GCP OS Login と Shielded VM を使用
+- Azure は SSH 公開鍵を変数として受け取る
 
-### プロバイダ別設定
-
-| Provider | 主なリソース | セキュリティ設定 |
-|---|---|---|
-| AWS | EC2、Security Group | IMDSv2必須、暗号化root disk、Public IP/SSH/Web/egress制御 |
-| GCP | Compute Engine、Firewall | OS Login、Shielded VM、Public IP/SSH/Web制御 |
-| Azure | Resource Group、VNet、NSG、Linux VM | Secure Boot、vTPM、公開鍵変数、SSH/Web CIDR制御 |
-
-### 利用手順
+利用時はサンプルをコピーし、環境に合わせて値を設定します。
 
 ```bash
-dev-box deploy --provider aws
 cd terraform
 cp terraform.tfvars.example terraform.tfvars
-```
-
-`terraform.tfvars`のサンプル値を実環境の値へ変更してから実行します。
-
-```bash
 terraform fmt -recursive
 terraform init
 terraform validate
@@ -504,41 +394,73 @@ terraform plan
 terraform apply
 ```
 
-生成されるTerraformはVMと基本ネットワークを構築し、Dockerをインストールするところまでを対象とします。アプリケーションの転送、起動、TLS、DNS、監視、バックアップは行いません。
+Terraform の対象は VM、基本ネットワーク、Docker のインストールまでです。アプリケーション転送、TLS、DNS、バックアップは別途構成してください。
 
-## CI
+## CI と監視
 
-### dev-boxリポジトリ自身のCI
+### GitHub Actions
 
-`.github/workflows/ci.yml`では次を検証します。
+`--cicd` を指定すると、生成先プロジェクトに次の検証を行うワークフローを追加します。
 
-- `gofmt`
-- `go mod tidy`後の差分
-- `go vet`
-- `go test -race`
-- `golangci-lint`
-- 複数スタックの`docker compose config`
-- `dev-box.yaml`からの再生成と構成の安定性
-- Kubernetes YAMLの`kubeconform`
-- frontendと全バックエンドのDocker image build、非rootユーザー、HTTP health check
-- AWS/GCP/Azureの`terraform fmt`、`init`、`validate`
-- TrivyによるTerraform構成スキャン
+- Docker Compose 設定の検証
+- Trivy による `CRITICAL` / `HIGH` 脆弱性スキャン
+- サービスの実起動
+- コンテナ状態、health check、HTTP 応答の確認
+- 失敗時のログ出力と終了時の後片付け
 
-### 生成先プロジェクトのCI
+### Monitoring
 
-`init --cicd`で生成されるワークフローは次を実行します。
+`--monitoring` を指定すると次を追加します。
 
-- Compose設定の検証
-- Trivyによる`CRITICAL`/`HIGH`脆弱性スキャン
-- `docker compose up -d`によるサービス起動
-- コンテナ状態とhealth checkの待機
-- APIまたはfrontendへのHTTP確認
-- 失敗時のログ出力
-- `docker compose down -v`による後片付け
+- Prometheus による API `/metrics` の収集
+- Grafana の Prometheus datasource provisioning
+- Loki と Promtail によるログ収集設定
 
-## 開発
+Promtail のホストログマウントは Linux を前提としています。Docker Desktop では取得できるログ範囲が異なります。
 
-### ビルドとテスト
+## 安全性と信頼性
+
+`init`、`k8s`、`deploy` は共通の安全な書き込み処理を使用します。
+
+- 上書き対象を事前に検出
+- `--dry-run` による生成内容の確認
+- シンボリックリンクへの上書きを拒否
+- 一時ファイルへ書き込んでから rename
+- 途中失敗時に既存ファイルをロールバック
+- `.gitignore` を置換せず必要な項目だけ追加
+- Ctrl+C などのキャンセルを Context 経由で処理
+
+既存プロジェクトへ生成する場合は、先に Git へコミットしておくことを推奨します。
+
+## Docker と Podman の切り替え
+
+`start`、`stop`、`status`、`logs` は `docker` を探し、見つからない場合は `podman` を使用します。明示的に指定する場合は `DOCKER_CMD` を設定します。
+
+```bash
+DOCKER_CMD=podman dev-box start
+```
+
+PowerShell:
+
+```powershell
+$env:DOCKER_CMD = "podman"
+dev-box start
+```
+
+## 既知の制約
+
+- 生成コードは最小実装であり、認証、認可、業務ロジック、永続化、migration は含みません。
+- Compose のホスト側ポートは固定されません。起動後に確認してください。
+- Kubernetes のアプリケーションイメージは利用者がビルド、配布、タグ管理する必要があります。
+- Kubernetes の Database は StatefulSet ではなく Deployment + PVC です。本番ではマネージド DB や専用 Operator を検討してください。
+- Kubernetes の `db-secret` は自動生成されません。
+- Frontend の外部公開範囲や Ingress Controller 名前空間はクラスタ要件に合わせて調整してください。
+- LocalStack はサービスを起動しますが、S3 bucket などのリソース自体は作成しません。
+- AWS/GCP の外部アクセスには Public IP、NAT、踏み台、IAP などの追加設計が必要です。
+- コンテナイメージはバージョンタグ固定であり、digest 固定ではありません。
+- Promtail は今後のサポート方針を確認し、必要に応じて Grafana Alloy などへの移行を検討してください。
+
+## dev-box 自体の開発
 
 ```bash
 go mod tidy
@@ -548,7 +470,7 @@ go build ./...
 golangci-lint run ./...
 ```
 
-Makefileを使用する場合:
+Makefile も利用できます。
 
 ```bash
 make build
@@ -556,40 +478,25 @@ make test
 make lint
 ```
 
-### ディレクトリ構成
+主なディレクトリ:
 
 ```text
 dev-box/
-|-- cmd/                  # Cobraコマンド、生成ファイルの書き込み制御
+|-- cmd/                  # Cobra コマンド
 |-- internal/
-|   |-- config/           # 選択値、バージョン、バリデーション
-|   |-- fs/               # OS/Mockファイルシステム
-|   |-- generator/        # Compose、K8s、Terraform、CI、scaffold生成
-|   |-- registry/         # frontend/backend定義とポート情報
-|   `-- security/         # パスワード生成
-|-- frontend/             # リポジトリ自身の生成例
-|-- backend/              # リポジトリ自身の生成例
-|-- k8s-manifests/        # リポジトリ自身の生成例
+|   |-- config/           # 設定、バージョン、バリデーション
+|   |-- fs/               # ファイルシステム抽象化
+|   |-- generator/        # Compose、K8s、Terraform、CI の生成
+|   |-- registry/         # Frontend/Backend 定義
+|   `-- security/         # 秘密情報生成
+|-- frontend/             # 生成例
+|-- backend/              # 生成例
+|-- k8s-manifests/        # 生成例
 |-- main.go
-|-- Makefile
-`-- .goreleaser.yaml
+`-- Makefile
 ```
 
-テンプレートは`embed.FS`に組み込まれるため、リリース後は単一バイナリで生成できます。
-
-## 既知の制約
-
-- Composeのホスト側ポートは固定されません。起動後に`status`または`docker compose port`で確認してください。
-- Composeは開発用のbase imageとbind mountを使用します。生成Dockerfileは主に本番イメージ/Kubernetes向けです。
-- Kubernetesのfrontend/APIイメージ名は`dev-box-frontend:latest`と`dev-box-api:latest`です。利用者がビルド、配布、タグ管理を行う必要があります。
-- KubernetesのDatabaseはStatefulSetではなくDeploymentとPVCです。本番データベース用途ではマネージドサービスや専用Operatorを検討してください。
-- Kubernetesの`db-secret`は自動生成されません。
-- frontend用NetworkPolicyには`0.0.0.0/0`からのIngress許可が含まれます。非公開構成では削除またはCIDR制限してください。
-- PromtailはGrafana Labsの今後のサポート方針を確認し、必要に応じてGrafana Alloyなどへの移行を検討してください。
-- LocalStackは選択したAWSサービスを起動しますが、リソース自体は作成しません。
-- AWS/GCPはPublic IPを既定で作成しません。外部アクセスや起動時のパッケージ取得には、Public IPの明示的な有効化、NAT、踏み台、IAPなどを環境に合わせて構成してください。Azureは現行テンプレートでPublic IPを作成します。
-- コンテナイメージはバージョンタグ固定であり、digest固定ではありません。
-- 生成コードは最小実装です。認証、認可、入力検証、永続化、migration、業務ロジック、包括的テストは含まれません。
+テンプレートは `embed.FS` に組み込まれるため、リリース版は単一バイナリで動作します。
 
 ## ライセンス
 
