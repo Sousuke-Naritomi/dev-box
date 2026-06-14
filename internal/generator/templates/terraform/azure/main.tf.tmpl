@@ -98,8 +98,8 @@ resource "azurerm_linux_virtual_machine" "devbox" {
   location            = azurerm_resource_group.devbox.location
   size                = "Standard_B1s"
   admin_username      = var.admin_username
-	secure_boot_enabled = true
-	vtpm_enabled        = true
+  secure_boot_enabled = true
+  vtpm_enabled        = true
 
   network_interface_ids = [
     azurerm_network_interface.devbox.id,
@@ -107,7 +107,7 @@ resource "azurerm_linux_virtual_machine" "devbox" {
 
   admin_ssh_key {
     username   = var.admin_username
-    public_key = file("~/.ssh/id_rsa.pub")
+    public_key = var.ssh_public_key
   }
 
   os_disk {

@@ -121,3 +121,14 @@ func TestEveryBackendDockerfileDeclaresNonRootUser(t *testing.T) {
 		})
 	}
 }
+
+func TestPHPDockerfileRoutesHealthEndpointsToFrontController(t *testing.T) {
+	files, err := GenerateScaffold(config.ProjectConfig{Frontend: config.FrontendNone, Backend: config.BackendPHP})
+	if err != nil {
+		t.Fatalf("GenerateScaffold failed: %v", err)
+	}
+	dockerfile := files["backend/Dockerfile"].Content
+	if !strings.Contains(dockerfile, "FallbackResource /index.php") {
+		t.Fatal("PHP Dockerfile must route application paths through index.php")
+	}
+}

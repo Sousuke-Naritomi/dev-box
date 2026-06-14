@@ -44,8 +44,13 @@ type ComposeData struct {
 // ResolveComposeData resolves ports and generates passwords based on the project config.
 func ResolveComposeData(cfg config.ProjectConfig) (*ComposeData, error) {
 	data := &ComposeData{
-		Config:            cfg,
-		HasVolumes:        cfg.Database != "none" && cfg.Database != "",
+		Config: cfg,
+		HasVolumes: cfg.Database != config.DatabaseNone ||
+			cfg.Frontend != config.FrontendNone ||
+			cfg.Backend == config.BackendNode ||
+			cfg.Backend == config.BackendGo ||
+			cfg.LocalStack ||
+			cfg.Monitoring,
 		VersionNode:       config.VersionNode,
 		VersionPython:     config.VersionPython,
 		VersionGo:         config.VersionGo,

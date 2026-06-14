@@ -11,11 +11,11 @@ func GenerateTerraform(provider string) (map[string]FileDef, error) {
 
 	switch provider {
 	case "aws":
-		tfvarsContent = "key_name = \"your-ssh-key-name\"\nallowed_ssh_cidrs = [\"203.0.113.10/32\"]\nenable_public_web = false\nallowed_web_cidrs = []"
+		tfvarsContent = "key_name = \"your-ssh-key-name\"\nenable_public_ip = false\nallowed_ssh_cidrs = [\"203.0.113.10/32\"]\nenable_public_web = false\nallowed_web_cidrs = []\nallowed_egress_cidrs = []"
 	case "gcp":
-		tfvarsContent = "project_id = \"your-gcp-project-id\"\nallowed_ssh_cidrs = [\"203.0.113.10/32\"]\nenable_public_web = false\nallowed_web_cidrs = []"
+		tfvarsContent = "project_id = \"your-gcp-project-id\"\nenable_public_ip = false\nallowed_ssh_cidrs = [\"203.0.113.10/32\"]\nenable_public_web = false\nallowed_web_cidrs = []"
 	case "azure":
-		tfvarsContent = "allowed_ssh_cidrs = [\"203.0.113.10/32\"]\nenable_public_web = false\nallowed_web_cidrs = []"
+		tfvarsContent = "ssh_public_key = \"ssh-ed25519 replace-with-your-public-key\"\nallowed_ssh_cidrs = [\"203.0.113.10/32\"]\nenable_public_web = false\nallowed_web_cidrs = []"
 	default:
 		return nil, fmt.Errorf("unsupported provider: %q (supported: aws, gcp, azure)", provider)
 	}

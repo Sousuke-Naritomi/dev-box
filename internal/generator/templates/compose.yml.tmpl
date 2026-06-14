@@ -170,8 +170,9 @@ services:
       - dev-network
 {{- end }}
 
-volumes:
 {{- if .HasVolumes }}
+volumes:
+{{- if and (ne .Config.Database "none") (ne .Config.Database "") }}
   db-data:
 {{- end }}
 {{- if and (ne .Config.Frontend "none") (ne .Config.Frontend "") }}
@@ -190,6 +191,7 @@ volumes:
   prometheus-data:
   grafana-data:
   loki-data:
+{{- end }}
 {{- end }}
 
 networks:

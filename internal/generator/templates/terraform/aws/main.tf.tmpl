@@ -62,19 +62,24 @@ resource "aws_security_group" "devbox" {
     }
   }
 
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
+  dynamic "egress" {
+    for_each = toset(var.allowed_egress_cidrs)
+    content {
+      description = "Explicitly allowed outbound traffic"
+      from_port   = 0
+      to_port     = 0
+      protocol    = "-1"
+      cidr_blocks = [egress.value]
+    }
   }
 }
 
 resource "aws_instance" "devbox" {
-  ami                    = data.aws_ami.ubuntu.id
-  instance_type          = var.instance_type
-  key_name               = var.key_name
-  vpc_security_group_ids = [aws_security_group.devbox.id]
+  ami                         = data.aws_ami.ubuntu.id
+  instance_type               = var.instance_type
+  key_name                    = var.key_name
+  vpc_security_group_ids      = [aws_security_group.devbox.id]
+  associate_public_ip_address = var.enable_public_ip
 
   metadata_options {
     http_endpoint = "enabled"

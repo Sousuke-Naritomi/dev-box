@@ -473,6 +473,8 @@ terraform/
 
 - SSH許可CIDRの既定値は空
 - HTTP/HTTPS公開は既定で無効
+- AWS/GCPのPublic IPは既定で無効
+- AWSのoutbound CIDRは既定で空
 - `terraform.tfvars.example`には置換用のサンプルCIDRを記載
 - VM起動時にDocker EngineとCompose pluginをインストール
 
@@ -480,9 +482,9 @@ terraform/
 
 | Provider | 主なリソース | セキュリティ設定 |
 |---|---|---|
-| AWS | EC2、Security Group | IMDSv2必須、暗号化root disk、SSH/Web CIDR制御 |
-| GCP | Compute Engine、Firewall | OS Login、Shielded VM、SSH/Web CIDR制御 |
-| Azure | Resource Group、VNet、NSG、Linux VM | Secure Boot、vTPM、SSH/Web CIDR制御 |
+| AWS | EC2、Security Group | IMDSv2必須、暗号化root disk、Public IP/SSH/Web/egress制御 |
+| GCP | Compute Engine、Firewall | OS Login、Shielded VM、Public IP/SSH/Web制御 |
+| Azure | Resource Group、VNet、NSG、Linux VM | Secure Boot、vTPM、公開鍵変数、SSH/Web CIDR制御 |
 
 ### 利用手順
 
@@ -585,7 +587,7 @@ dev-box/
 - frontend用NetworkPolicyには`0.0.0.0/0`からのIngress許可が含まれます。非公開構成では削除またはCIDR制限してください。
 - PromtailはGrafana Labsの今後のサポート方針を確認し、必要に応じてGrafana Alloyなどへの移行を検討してください。
 - LocalStackは選択したAWSサービスを起動しますが、リソース自体は作成しません。
-- Terraformは各クラウドでPublic IPを持つVMを作成します。SSH/Webの受信規則は既定で閉じていますが、Public IP自体が不要な場合はテンプレートを変更してください。
+- AWS/GCPはPublic IPを既定で作成しません。外部アクセスや起動時のパッケージ取得には、Public IPの明示的な有効化、NAT、踏み台、IAPなどを環境に合わせて構成してください。Azureは現行テンプレートでPublic IPを作成します。
 - コンテナイメージはバージョンタグ固定であり、digest固定ではありません。
 - 生成コードは最小実装です。認証、認可、入力検証、永続化、migration、業務ロジック、包括的テストは含まれません。
 

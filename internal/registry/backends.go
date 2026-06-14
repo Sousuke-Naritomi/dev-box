@@ -55,7 +55,7 @@ var SupportedBackends = map[config.BackendType]BackendFramework{
 		InternalPort: 80,
 		ImagePort:    8080,
 		RunAsUser:    33,
-		Command:      "",
+		Command:      `php -S 0.0.0.0:80 index.php`,
 		Volumes:      []string{"./backend:/var/www/html"},
 		TemplateDir:  "templates/scaffold/backend/php",
 	},

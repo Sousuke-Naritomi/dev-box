@@ -52,6 +52,9 @@ func (c *ProjectConfig) Validate() error {
 	if !c.HasWorkload() && !c.LocalStack && !c.Monitoring {
 		return fmt.Errorf("at least one service must be selected")
 	}
+	if c.Nginx && c.Frontend == FrontendNone && c.Backend == BackendNone {
+		return fmt.Errorf("nginx requires a frontend or backend service")
+	}
 
 	return nil
 }

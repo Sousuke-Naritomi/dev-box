@@ -15,6 +15,12 @@ variable "zone" {
   default     = "asia-northeast1-a"
 }
 
+variable "enable_public_ip" {
+  description = "Whether to allocate an external IPv4 address"
+  type        = bool
+  default     = false
+}
+
 variable "allowed_ssh_cidrs" {
   description = "CIDR blocks allowed to connect over SSH; empty disables public SSH"
   type        = list(string)

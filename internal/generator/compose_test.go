@@ -155,6 +155,49 @@ func TestRenderCompose_JavaBackend(t *testing.T) {
 	}
 }
 
+func TestRenderCompose_PHPUsesFrontController(t *testing.T) {
+	cfg := config.ProjectConfig{Backend: config.BackendPHP, Frontend: config.FrontendNone, Database: config.DatabaseNone, Cache: config.CacheNone}
+	data, err := ResolveComposeData(cfg)
+	if err != nil {
+		t.Fatalf("ResolveComposeData failed: %v", err)
+	}
+	result, err := RenderCompose(data)
+	if err != nil {
+		t.Fatalf("RenderCompose failed: %v", err)
+	}
+	if !strings.Contains(result, "php -S 0.0.0.0:80 index.php") {
+		t.Fatal("PHP Compose service must route all requests through index.php")
+	}
+	var parsed struct {
+		Volumes map[string]any `yaml:"volumes"`
+	}
+	if err := yaml.Unmarshal([]byte(result), &parsed); err != nil {
+		t.Fatalf("generated PHP Compose is invalid YAML: %v", err)
+	}
+	if parsed.Volumes != nil {
+		t.Fatalf("PHP-only Compose must omit an empty volumes section: %#v", parsed.Volumes)
+	}
+}
+
+func TestResolveComposeDataDetectsNamedVolumes(t *testing.T) {
+	tests := []config.ProjectConfig{
+		{Frontend: config.FrontendReact, Backend: config.BackendNone, Database: config.DatabaseNone, Cache: config.CacheNone},
+		{Frontend: config.FrontendNone, Backend: config.BackendNode, Database: config.DatabaseNone, Cache: config.CacheNone},
+		{Frontend: config.FrontendNone, Backend: config.BackendGo, Database: config.DatabaseNone, Cache: config.CacheNone},
+		{Frontend: config.FrontendNone, Backend: config.BackendNone, Database: config.DatabaseNone, Cache: config.CacheNone, LocalStack: true},
+		{Frontend: config.FrontendNone, Backend: config.BackendNone, Database: config.DatabaseNone, Cache: config.CacheNone, Monitoring: true},
+	}
+	for _, cfg := range tests {
+		data, err := ResolveComposeData(cfg)
+		if err != nil {
+			t.Fatalf("ResolveComposeData failed: %v", err)
+		}
+		if !data.HasVolumes {
+			t.Fatalf("expected named volumes for config %#v", cfg)
+		}
+	}
+}
+
 func TestRenderEnvFile_MySQL(t *testing.T) {
 	cfg := config.ProjectConfig{Database: "mysql", Backend: "node", Frontend: "none", Cache: "none"}
 	data, _ := ResolveComposeData(cfg)

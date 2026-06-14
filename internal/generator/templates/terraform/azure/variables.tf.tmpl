@@ -10,6 +10,11 @@ variable "admin_username" {
   default     = "azureuser"
 }
 
+variable "ssh_public_key" {
+  description = "OpenSSH public key used to access the VM"
+  type        = string
+}
+
 variable "allowed_ssh_cidrs" {
   description = "CIDR blocks allowed to connect over SSH; empty disables public SSH"
   type        = list(string)

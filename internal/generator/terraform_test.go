@@ -5,6 +5,22 @@ import (
 	"testing"
 )
 
+func TestGeneratedTerraformUsesCanonicalIndentation(t *testing.T) {
+	for _, provider := range []string{"aws", "gcp", "azure"} {
+		t.Run(provider, func(t *testing.T) {
+			files, err := GenerateTerraform(provider)
+			if err != nil {
+				t.Fatalf("GenerateTerraform failed: %v", err)
+			}
+			for path, file := range files {
+				if strings.Contains(file.Content, "\t") {
+					t.Fatalf("%s contains tab indentation and will fail terraform fmt -check", path)
+				}
+			}
+		})
+	}
+}
+
 func TestGenerateTerraform_AWS(t *testing.T) {
 	files, err := GenerateTerraform("aws")
 	if err != nil {
@@ -57,6 +73,14 @@ func TestGenerateTerraform_AWS(t *testing.T) {
 			t.Errorf("expected AWS Terraform to contain %q", securitySetting)
 		}
 	}
+	if strings.Contains(mainTF.Content, `cidr_blocks = ["0.0.0.0/0"]`) {
+		t.Error("AWS Terraform must not allow unrestricted egress by default")
+	}
+	for _, setting := range []string{"allowed_egress_cidrs", "enable_public_ip"} {
+		if !strings.Contains(mainTF.Content+varsTF.Content, setting) {
+			t.Errorf("expected AWS Terraform to contain %q", setting)
+		}
+	}
 }
 
 func TestGenerateTerraform_GCP(t *testing.T) {
@@ -75,6 +99,10 @@ func TestGenerateTerraform_GCP(t *testing.T) {
 	}
 	if !strings.Contains(files["variables.tf"].Content, "allowed_ssh_cidrs") {
 		t.Error("expected GCP SSH CIDR allowlist")
+	}
+	if !strings.Contains(files["variables.tf"].Content, "enable_public_ip") ||
+		!strings.Contains(files["main.tf"].Content, "var.enable_public_ip ? [1] : []") {
+		t.Error("expected GCP public IP allocation to be opt-in")
 	}
 }
 
@@ -107,6 +135,16 @@ func TestGenerateTerraform_Azure(t *testing.T) {
 	}
 	if !strings.Contains(files["variables.tf"].Content, "allowed_ssh_cidrs") {
 		t.Error("expected Azure SSH CIDR allowlist")
+	}
+	if !strings.Contains(files["variables.tf"].Content, "variable \"ssh_public_key\"") ||
+		!strings.Contains(files["main.tf"].Content, "public_key = var.ssh_public_key") {
+		t.Error("expected Azure SSH public key to be supplied as a variable")
+	}
+	if strings.Contains(files["main.tf"].Content, `file("~/.ssh/id_rsa.pub")`) {
+		t.Error("Azure configuration must not read a host-specific SSH key during terraform validate")
+	}
+	if !strings.Contains(files["terraform.tfvars.example"].Content, "ssh_public_key") {
+		t.Error("expected Azure tfvars example to document ssh_public_key")
 	}
 }
 
