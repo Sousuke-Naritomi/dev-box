@@ -1,10 +1,6 @@
 package cmd
 
-import (
-	"fmt"
-
-	"github.com/spf13/cobra"
-)
+import "github.com/spf13/cobra"
 
 var (
 	Version         = "dev"
@@ -14,8 +10,8 @@ var (
 var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Show CLI and template versions",
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Fprintf(cmd.OutOrStdout(), "dev-box %s\ntemplate schema %s\n", Version, TemplateVersion)
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return writeCommandOutput(cmd.OutOrStdout(), "dev-box %s\ntemplate schema %s\n", Version, TemplateVersion)
 	},
 }
 

@@ -76,7 +76,9 @@ func writeGeneratedFiles(ctx context.Context, fileSystem fs.FileSystem, outputDi
 		return nil
 	}
 	if len(existing) > 0 && !force {
-		fmt.Fprintf(output, "Existing files would be overwritten:\n  %s\n", strings.Join(existing, "\n  "))
+		if err := writeCommandOutput(output, "Existing files would be overwritten:\n  %s\n", strings.Join(existing, "\n  ")); err != nil {
+			return err
+		}
 		if !term.IsTerminal(int(os.Stdin.Fd())) {
 			return fmt.Errorf("existing files found in a non-interactive environment; use --force to overwrite")
 		}

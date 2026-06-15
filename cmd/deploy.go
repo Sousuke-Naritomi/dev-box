@@ -48,12 +48,16 @@ func runDeploy(cmd *cobra.Command, args []string) error {
 	force, _ := cmd.Flags().GetBool("force")
 	dryRun, _ := cmd.Flags().GetBool("dry-run")
 	outputDir, _ := cmd.Flags().GetString("output-dir")
-	fmt.Fprintf(cmd.OutOrStdout(), "\nGenerating Terraform configuration for %s...\n", provider)
+	if err := writeCommandOutput(cmd.OutOrStdout(), "\nGenerating Terraform configuration for %s...\n", provider); err != nil {
+		return err
+	}
 	if err := runDeployLogic(cmd.Context(), provider, outputDir, force, dryRun, cmd.OutOrStdout(), app.FS, app.Gen); err != nil {
 		return err
 	}
 	if !dryRun {
-		fmt.Fprintf(cmd.OutOrStdout(), "Successfully generated Terraform files in %s.\n", outputDir)
+		if err := writeCommandOutput(cmd.OutOrStdout(), "Successfully generated Terraform files in %s.\n", outputDir); err != nil {
+			return err
+		}
 	}
 	return nil
 }

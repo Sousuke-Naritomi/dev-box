@@ -32,7 +32,7 @@ func ParseProjectFile(data []byte) (ProjectConfig, error) {
 	if err := ensureSingleYAMLDocument(decoder); err != nil {
 		return ProjectConfig{}, err
 	}
-	if err := file.ProjectConfig.Validate(); err != nil {
+	if err := file.Validate(); err != nil {
 		return ProjectConfig{}, fmt.Errorf("validating project configuration: %w", err)
 	}
 	return file.ProjectConfig, nil

@@ -125,7 +125,9 @@ func runInit(cmd *cobra.Command, args []string) error {
 }
 
 func runInitLogic(ctx context.Context, cfg config.ProjectConfig, outputDir string, dryRun bool, output io.Writer, fileSystem fs.FileSystem, gen generator.Generator) error {
-	fmt.Fprintf(output, "Generating environment: frontend=%s backend=%s database=%s cache=%s\n", cfg.Frontend, cfg.Backend, cfg.Database, cfg.Cache)
+	if err := writeCommandOutput(output, "Generating environment: frontend=%s backend=%s database=%s cache=%s\n", cfg.Frontend, cfg.Backend, cfg.Database, cfg.Cache); err != nil {
+		return err
+	}
 
 	data, err := generator.ResolveComposeData(cfg)
 	if err != nil {
@@ -148,7 +150,9 @@ func runInitLogic(ctx context.Context, cfg config.ProjectConfig, outputDir strin
 	needsEnv := cfg.Database != config.DatabaseNone || cfg.Monitoring || cfg.Backend != config.BackendNone
 	if needsEnv {
 		if runtime.GOOS == "windows" {
-			fmt.Fprintln(output, "Note: verify the Windows ACL on .env; POSIX mode 0600 does not map directly to NTFS permissions.")
+			if err := writeCommandOutput(output, "Note: verify the Windows ACL on .env; POSIX mode 0600 does not map directly to NTFS permissions.\n"); err != nil {
+				return err
+			}
 		}
 		envContent, err := generator.RenderEnvFile(data)
 		if err != nil {
@@ -224,12 +228,18 @@ func runInitLogic(ctx context.Context, cfg config.ProjectConfig, outputDir strin
 		return nil
 	}
 
-	fmt.Fprintln(output, "Successfully generated local environment configuration.")
+	if err := writeCommandOutput(output, "Successfully generated local environment configuration.\n"); err != nil {
+		return err
+	}
 	if needsEnv {
-		fmt.Fprintln(output, "A secure .env file was generated and added to .gitignore.")
+		if err := writeCommandOutput(output, "A secure .env file was generated and added to .gitignore.\n"); err != nil {
+			return err
+		}
 	}
 	if cfg.CICD {
-		fmt.Fprintln(output, "Generated .github/workflows/ci.yml.")
+		if err := writeCommandOutput(output, "Generated .github/workflows/ci.yml.\n"); err != nil {
+			return err
+		}
 	}
 	return nil
 }

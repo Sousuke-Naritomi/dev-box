@@ -14,8 +14,8 @@ jobs:
     name: Go quality
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache: true
@@ -29,9 +29,9 @@ jobs:
         run: go vet ./...
       - name: Test with race detector
         run: go test -race -coverprofile=coverage.out ./...
-      - uses: golangci/golangci-lint-action@v6
+      - uses: golangci/golangci-lint-action@v9
         with:
-          version: v2.1.6
+          version: v2.12.2
 
   generated-compose:
     name: Validate generated Compose
@@ -44,8 +44,8 @@ jobs:
           - "--frontend=none --backend=node --database=mysql --cache=none"
           - "--frontend=vue --backend=none --database=none --cache=none"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
       - name: Generate stack
@@ -58,8 +58,8 @@ jobs:
     name: Replay declarative project configuration
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
       - name: Generate initial project
@@ -76,8 +76,8 @@ jobs:
     name: Validate generated Kubernetes
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
       - name: Generate project configuration
@@ -91,8 +91,8 @@ jobs:
     name: Build and run generated frontend image
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
       - name: Generate frontend image
@@ -133,8 +133,8 @@ jobs:
           - backend: java
             user: "10001:10001"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
       - name: Generate backend image
@@ -165,8 +165,8 @@ jobs:
       matrix:
         provider: [aws, gcp, azure]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
       - uses: hashicorp/setup-terraform@v3
@@ -182,7 +182,7 @@ jobs:
         working-directory: ${{ runner.temp }}/terraform
         run: terraform validate
       - name: Security scan
-        uses: aquasecurity/trivy-action@0.32.0
+        uses: aquasecurity/trivy-action@0.36.0
         with:
           scan-type: config
           scan-ref: ${{ runner.temp }}/terraform

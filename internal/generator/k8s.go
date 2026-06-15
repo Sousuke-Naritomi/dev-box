@@ -63,9 +63,10 @@ func GenerateK8sManifests(cfg config.ProjectConfig) (map[string]FileDef, error) 
 	if b, ok := registry.SupportedBackends[cfg.Backend]; ok {
 		policyData.BackendPort = b.ImagePort
 	}
-	if cfg.Database == config.DatabaseMySQL {
+	switch cfg.Database {
+	case config.DatabaseMySQL:
 		policyData.DatabasePort = 3306
-	} else if cfg.Database == config.DatabasePostgres {
+	case config.DatabasePostgres:
 		policyData.DatabasePort = 5432
 	}
 	var netPol bytes.Buffer
