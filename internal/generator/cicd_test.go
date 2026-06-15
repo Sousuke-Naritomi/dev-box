@@ -22,7 +22,7 @@ func TestGenerateCICD_BackendUsesDynamicComposePort(t *testing.T) {
 		"docker compose config",
 		"cp .env.example .env",
 		"actions/checkout@v6",
-		"aquasecurity/trivy-action@0.36.0",
+		"aquasecurity/trivy-action@v0.36.0",
 		"docker compose port api 3000",
 		"http://localhost:${API_PORT}/health",
 		"API health check attempt $i/30",

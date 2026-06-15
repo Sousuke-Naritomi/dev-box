@@ -182,7 +182,7 @@ jobs:
         working-directory: ${{ runner.temp }}/terraform
         run: terraform validate
       - name: Security scan
-        uses: aquasecurity/trivy-action@0.36.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: config
           scan-ref: ${{ runner.temp }}/terraform
