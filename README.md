@@ -171,6 +171,24 @@ dev-box stop
 
 `stop` は名前付きボリュームを削除しないため、データベースなどのデータは保持されます。
 
+## DevBox Studio
+
+DevBox Studio は、`dev-box` をブラウザから操作するための補助アプリケーションです。技術スタックを選択すると、生成されるファイルを事前に確認でき、そのままプロジェクトを作成できます。
+
+![DevBox Studio のメイン画面](docs/images/devbox-studio-main.png)
+
+構成を変更すると、生成予定のファイル数や内容も変わります。たとえば Vue、Node.js、MySQL などの組み合わせを選び、生成結果を画面上で確認できます。
+
+![構成を変更して生成した画面](docs/images/devbox-studio-minimal-stack.png)
+
+生成後は、フロントエンド、バックエンド、Docker Compose、監視設定、CI 設定などがプロジェクトとして出力されます。
+
+![生成されたプロジェクトファイル](docs/images/devbox-studio-generated-files.png)
+
+GitHub Actions では、CLI 本体、Studio backend、Studio frontend の検証を実行します。
+
+![GitHub Actions の成功画面](docs/images/devbox-studio-ci.png)
+
 ## 非対話で生成する
 
 CI やスクリプトから利用する場合は、Core 構成をすべて指定します。
