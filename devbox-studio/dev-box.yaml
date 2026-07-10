@@ -1,0 +1,9 @@
+version: 1
+frontend: react
+backend: go
+database: none
+cache: none
+nginx: true
+localstack: false
+monitoring: false
+cicd: true

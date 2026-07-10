@@ -1,0 +1,15 @@
+.env
+node_modules/
+__pycache__/
+*.pyc
+.vscode/
+.idea/
+*.class
+target/
+vendor/
+dist/
+build/
+tmp/
+.cache/
+generated/
+*.exe

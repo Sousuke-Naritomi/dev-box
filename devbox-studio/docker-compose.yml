@@ -1,0 +1,49 @@
+services:
+
+  frontend:
+    image: node:20-alpine
+    restart: unless-stopped
+    working_dir: /app
+    volumes:
+      - ./frontend:/app
+      - frontend-node-modules:/app/node_modules
+    command: sh -c "npm ci && npm run dev -- --host 0.0.0.0"
+    ports:
+      - "127.0.0.1:0:5173"
+    networks:
+      - dev-network
+
+  api:
+    image: golang:1.22-alpine
+    working_dir: /app
+    volumes:
+      - ./backend:/app
+      - go-mod-cache:/go/pkg/mod
+    command: sh -c "go run main.go"
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:0:8080"
+    env_file:
+      - .env
+    networks:
+      - dev-network
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:0:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - api
+      - frontend
+    networks:
+      - dev-network
+volumes:
+  frontend-node-modules:
+  go-mod-cache:
+
+networks:
+  dev-network:
+    driver: bridge
