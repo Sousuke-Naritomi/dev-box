@@ -256,16 +256,24 @@ dev-box init --config dev-box.yaml --backend python --monitoring=false
 --config string
 --force
 --dry-run
+--format string  text | json  既定値: text
 --output-dir string  既定値: .
 ```
 
 ### 共通の生成オプション
 
 - `--dry-run`: ファイルを書き込まず、生成予定の内容を表示
+- `--format json`: `--dry-run` と組み合わせて、生成予定ファイルを機械処理しやすい JSON で出力
 - `--output-dir`: 生成先ディレクトリを指定
 - `--force`: 確認せず既存ファイルを上書き
 
 既存ファイルがある場合、通常は上書き対象を表示して確認します。非対話環境では `--force` がなければ処理を中止します。
+
+JSON 出力は DevBox Studio など、`dev-box` を別ツールから利用する場合に使えます。
+
+```bash
+dev-box init --frontend react --backend go --database postgres --cache redis --dry-run --format json
+```
 
 ## 生成されるファイル
 

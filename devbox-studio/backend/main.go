@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -39,6 +38,14 @@ type generatedFile struct {
 	Bytes   int    `json:"bytes"`
 }
 
+type devBoxJSONOutput struct {
+	Files []devBoxJSONFile `json:"files"`
+}
+
+type devBoxJSONFile struct {
+	Path    string `json:"path"`
+	Content string `json:"content"`
+}
 type previewResponse struct {
 	Summary string          `json:"summary"`
 	Command []string        `json:"command"`
@@ -222,7 +229,28 @@ func runDevBoxPreview(ctx context.Context, cfg stackConfig) (previewResponse, er
 	if err != nil {
 		return previewResponse{}, err
 	}
-	files := parseDryRunFiles(raw, outputName)
+
+	var devBoxOutput devBoxJSONOutput
+	if err := json.Unmarshal([]byte(raw), &devBoxOutput); err != nil {
+		return previewResponse{}, fmt.Errorf("decoding dev-box json output: %w", err)
+	}
+	files := make([]generatedFile, 0, len(devBoxOutput.Files))
+	for _, file := range devBoxOutput.Files {
+		content := maskSensitiveFile(file.Path, file.Content)
+		files = append(files, generatedFile{
+			Path:    normalizePreviewPath(file.Path, outputName),
+			Kind:    classifyFile(file.Path),
+			Content: content,
+			Lines:   lineCount(content),
+			Bytes:   len([]byte(content)),
+		})
+	}
+	sort.Slice(files, func(i, j int) bool {
+		if files[i].Kind == files[j].Kind {
+			return files[i].Path < files[j].Path
+		}
+		return files[i].Kind < files[j].Kind
+	})
 	if len(files) == 0 {
 		return previewResponse{}, errors.New("dev-box returned no files to preview")
 	}
@@ -262,7 +290,7 @@ func devBoxArgs(cfg stackConfig, dryRun bool, outputDir string) []string {
 		args = append(args, "--cicd")
 	}
 	if dryRun {
-		args = append(args, "--dry-run")
+		args = append(args, "--dry-run", "--format", "json")
 	}
 	return args
 }
@@ -346,52 +374,6 @@ func containedPaths(root, target string) (string, string, error) {
 	return cleanRoot, cleanTarget, nil
 }
 
-func parseDryRunFiles(raw, outputName string) []generatedFile {
-	scanner := bufio.NewScanner(strings.NewReader(raw))
-	scanner.Buffer(make([]byte, 1024), 1024*1024*8)
-
-	var files []generatedFile
-	var currentPath string
-	var content strings.Builder
-	flush := func() {
-		if currentPath == "" {
-			return
-		}
-		text := strings.TrimSuffix(content.String(), "\n")
-		text = maskSensitiveFile(currentPath, text)
-		files = append(files, generatedFile{
-			Path:    normalizePreviewPath(currentPath, outputName),
-			Kind:    classifyFile(currentPath),
-			Content: text,
-			Lines:   lineCount(text),
-			Bytes:   len([]byte(text)),
-		})
-		content.Reset()
-	}
-
-	for scanner.Scan() {
-		line := scanner.Text()
-		if strings.HasPrefix(line, "--- ") && strings.HasSuffix(line, " ---") {
-			flush()
-			currentPath = strings.TrimSuffix(strings.TrimPrefix(line, "--- "), " ---")
-			continue
-		}
-		if currentPath != "" {
-			content.WriteString(line)
-			content.WriteByte('\n')
-		}
-	}
-	flush()
-
-	sort.Slice(files, func(i, j int) bool {
-		if files[i].Kind == files[j].Kind {
-			return files[i].Path < files[j].Path
-		}
-		return files[i].Kind < files[j].Kind
-	})
-	return files
-}
-
 func normalizePreviewPath(path, outputName string) string {
 	path = filepath.ToSlash(path)
 	prefix := strings.TrimSuffix(filepath.ToSlash(outputName), "/") + "/"
@@ -415,7 +397,6 @@ func maskSensitiveFile(path, content string) string {
 	}
 	return strings.Join(lines, "\n")
 }
-
 func classifyFile(path string) string {
 	slash := filepath.ToSlash(path)
 	switch {

@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -87,6 +88,59 @@ func TestInitCmd_E2E(t *testing.T) {
 		if !mockFS.Exists(ef) {
 			t.Errorf("expected file %q to be generated", ef)
 		}
+	}
+}
+
+func TestRunInitLogicJSONDryRunOutput(t *testing.T) {
+	fileSystem := fs.NewMockFileSystem()
+	gen := &MockGenerator{
+		ScaffoldFunc: func(cfg config.ProjectConfig) (map[string]generator.FileDef, error) {
+			return map[string]generator.FileDef{
+				"backend/main.go": {Content: "package main\n", Perm: 0644},
+			}, nil
+		},
+	}
+	cfg := config.ProjectConfig{
+		Frontend: config.FrontendNone,
+		Backend:  config.BackendGo,
+		Database: config.DatabaseNone,
+		Cache:    config.CacheNone,
+	}
+
+	var output bytes.Buffer
+	err := runInitLogic(context.Background(), cfg, "sample", true, "json", &output, fileSystem, gen)
+	if err != nil {
+		t.Fatalf("runInitLogic json failed: %v", err)
+	}
+	if fileSystem.Exists(filepath.Join("sample", "backend", "main.go")) {
+		t.Fatal("json dry-run must not write files")
+	}
+
+	var got initOutput
+	if err := json.Unmarshal(output.Bytes(), &got); err != nil {
+		t.Fatalf("expected valid json output: %v\n%s", err, output.String())
+	}
+	if !got.DryRun {
+		t.Fatal("expected dryRun=true")
+	}
+	if got.OutputDir != "sample" {
+		t.Fatalf("expected outputDir sample, got %q", got.OutputDir)
+	}
+	if len(got.Files) == 0 {
+		t.Fatal("expected generated files in json output")
+	}
+
+	foundBackend := false
+	for _, file := range got.Files {
+		if file.Path == "sample/backend/main.go" {
+			foundBackend = true
+			if file.Content != "package main\n" {
+				t.Fatalf("unexpected backend content: %q", file.Content)
+			}
+		}
+	}
+	if !foundBackend {
+		t.Fatalf("expected backend/main.go in json output: %#v", got.Files)
 	}
 }
 

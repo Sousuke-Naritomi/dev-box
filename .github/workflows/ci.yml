@@ -33,6 +33,36 @@ jobs:
         with:
           version: v2.12.2
 
+  studio-backend:
+    name: DevBox Studio API
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: devbox-studio/backend/go.mod
+          cache: false
+      - name: Test Studio API
+        working-directory: devbox-studio/backend
+        run: go test ./...
+
+  studio-frontend:
+    name: DevBox Studio frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: devbox-studio/frontend/package-lock.json
+      - name: Install dependencies
+        working-directory: devbox-studio/frontend
+        run: npm ci
+      - name: Build Studio frontend
+        working-directory: devbox-studio/frontend
+        run: npm run build
+
   generated-compose:
     name: Validate generated Compose
     runs-on: ubuntu-latest

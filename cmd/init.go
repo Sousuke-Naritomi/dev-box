@@ -2,11 +2,13 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
@@ -37,6 +39,7 @@ func init() {
 	initCmd.Flags().String("config", "", "Path to a dev-box.yaml project configuration")
 	initCmd.Flags().Bool("force", false, "Overwrite existing files without prompting")
 	initCmd.Flags().Bool("dry-run", false, "Print generated files without writing them")
+	initCmd.Flags().String("format", "text", "Output format for dry-run results (text, json)")
 	initCmd.Flags().String("output-dir", ".", "Directory to write generated files into")
 	rootCmd.AddCommand(initCmd)
 }
@@ -121,104 +124,60 @@ func runInit(cmd *cobra.Command, args []string) error {
 	}
 	outputDir, _ := cmd.Flags().GetString("output-dir")
 	dryRun, _ := cmd.Flags().GetBool("dry-run")
-	return runInitLogic(cmd.Context(), cfg, outputDir, dryRun, cmd.OutOrStdout(), app.FS, app.Gen)
+	outputFormat, _ := cmd.Flags().GetString("format")
+	return runInitLogic(cmd.Context(), cfg, outputDir, dryRun, outputFormat, cmd.OutOrStdout(), app.FS, app.Gen)
 }
 
-func runInitLogic(ctx context.Context, cfg config.ProjectConfig, outputDir string, dryRun bool, output io.Writer, fileSystem fs.FileSystem, gen generator.Generator) error {
-	if err := writeCommandOutput(output, "Generating environment: frontend=%s backend=%s database=%s cache=%s\n", cfg.Frontend, cfg.Backend, cfg.Database, cfg.Cache); err != nil {
-		return err
-	}
+type initOutputFile struct {
+	Path    string `json:"path"`
+	Content string `json:"content"`
+	Perm    string `json:"perm"`
+}
 
-	data, err := generator.ResolveComposeData(cfg)
-	if err != nil {
-		return fmt.Errorf("resolving configuration: %w", err)
-	}
-	filesToWrite := make(map[string]generator.FileDef)
+type initOutputConfig struct {
+	Frontend   config.FrontendType `json:"frontend"`
+	Backend    config.BackendType  `json:"backend"`
+	Database   config.DatabaseType `json:"database"`
+	Cache      config.CacheType    `json:"cache"`
+	Nginx      bool                `json:"nginx"`
+	LocalStack bool                `json:"localstack"`
+	Monitoring bool                `json:"monitoring"`
+	CICD       bool                `json:"cicd"`
+}
 
-	projectConfig, err := config.RenderProjectFile(cfg)
-	if err != nil {
-		return err
-	}
-	filesToWrite["dev-box.yaml"] = generator.FileDef{Content: projectConfig, Perm: 0644}
+type initOutput struct {
+	Config    initOutputConfig `json:"config"`
+	OutputDir string           `json:"outputDir"`
+	DryRun    bool             `json:"dryRun"`
+	Files     []initOutputFile `json:"files"`
+}
 
-	composeContent, err := generator.RenderCompose(data)
-	if err != nil {
-		return fmt.Errorf("rendering compose: %w", err)
+func runInitLogic(ctx context.Context, cfg config.ProjectConfig, outputDir string, dryRun bool, outputFormat string, output io.Writer, fileSystem fs.FileSystem, gen generator.Generator) error {
+	if outputFormat != "text" && outputFormat != "json" {
+		return fmt.Errorf("unsupported output format: %q", outputFormat)
 	}
-	filesToWrite["docker-compose.yml"] = generator.FileDef{Content: composeContent, Perm: 0644}
+	if outputFormat == "json" && !dryRun {
+		return fmt.Errorf("--format json requires --dry-run")
+	}
 
 	needsEnv := cfg.Database != config.DatabaseNone || cfg.Monitoring || cfg.Backend != config.BackendNone
-	if needsEnv {
-		if runtime.GOOS == "windows" {
+	if outputFormat == "text" {
+		if err := writeCommandOutput(output, "Generating environment: frontend=%s backend=%s database=%s cache=%s\n", cfg.Frontend, cfg.Backend, cfg.Database, cfg.Cache); err != nil {
+			return err
+		}
+		if runtime.GOOS == "windows" && needsEnv {
 			if err := writeCommandOutput(output, "Note: verify the Windows ACL on .env; POSIX mode 0600 does not map directly to NTFS permissions.\n"); err != nil {
 				return err
 			}
 		}
-		envContent, err := generator.RenderEnvFile(data)
-		if err != nil {
-			return fmt.Errorf("rendering env file: %w", err)
-		}
-		filesToWrite[".env"] = generator.FileDef{Content: envContent, Perm: 0600}
-
-		envExampleContent, err := generator.RenderEnvExampleFile(data)
-		if err != nil {
-			return fmt.Errorf("rendering env.example file: %w", err)
-		}
-		filesToWrite[".env.example"] = generator.FileDef{Content: envExampleContent, Perm: 0644}
-		filesToWrite[".gitignore"] = generator.FileDef{Content: generator.RenderGitignore(), Perm: 0644}
 	}
 
-	backendPort := 0
-	if backend, ok := registry.SupportedBackends[cfg.Backend]; ok {
-		backendPort = backend.InternalPort
-	}
-	frontendPort := 0
-	if frontend, ok := registry.SupportedFrontends[cfg.Frontend]; ok {
-		frontendPort = frontend.InternalPort
-	}
-
-	if cfg.Nginx && (cfg.Frontend != config.FrontendNone || cfg.Backend != config.BackendNone) {
-		nginxConf, err := generator.GenerateNginxConf(cfg, backendPort, frontendPort)
-		if err != nil {
-			return fmt.Errorf("generating nginx conf: %w", err)
-		}
-		filesToWrite[filepath.Join("nginx", "nginx.conf")] = generator.FileDef{Content: nginxConf, Perm: 0644}
-	}
-
-	if cfg.Monitoring {
-		prometheus, err := generator.RenderPrometheusConfig(backendPort)
-		if err != nil {
-			return fmt.Errorf("rendering Prometheus config: %w", err)
-		}
-		filesToWrite[filepath.Join("monitoring", "prometheus.yml")] = generator.FileDef{Content: prometheus, Perm: 0644}
-
-		datasource, err := generator.RenderGrafanaDatasource()
-		if err != nil {
-			return fmt.Errorf("rendering Grafana datasource: %w", err)
-		}
-		filesToWrite[filepath.Join("monitoring", "grafana", "provisioning", "datasources", "prometheus.yml")] = generator.FileDef{Content: datasource, Perm: 0644}
-
-		promtail, err := generator.RenderPromtailConfig()
-		if err != nil {
-			return fmt.Errorf("rendering Promtail config: %w", err)
-		}
-		filesToWrite[filepath.Join("monitoring", "promtail-config.yml")] = generator.FileDef{Content: promtail, Perm: 0644}
-	}
-
-	if cfg.CICD {
-		workflow, err := generator.GenerateCICD(cfg, backendPort, frontendPort)
-		if err != nil {
-			return fmt.Errorf("generating CI workflow: %w", err)
-		}
-		filesToWrite[filepath.Join(".github", "workflows", "ci.yml")] = generator.FileDef{Content: workflow, Perm: 0644}
-	}
-
-	scaffoldFiles, err := gen.GenerateScaffold(cfg)
+	filesToWrite, needsEnv, err := buildInitFiles(cfg, gen)
 	if err != nil {
-		return fmt.Errorf("generating scaffold: %w", err)
+		return err
 	}
-	for path, content := range scaffoldFiles {
-		filesToWrite[path] = content
+	if outputFormat == "json" {
+		return writeInitJSONOutput(ctx, fileSystem, outputDir, filesToWrite, cfg, output)
 	}
 
 	if err := writeGeneratedFiles(ctx, fileSystem, outputDir, filesToWrite, cfg.Force, dryRun, output); err != nil {
@@ -242,4 +201,137 @@ func runInitLogic(ctx context.Context, cfg config.ProjectConfig, outputDir strin
 		}
 	}
 	return nil
+}
+
+func buildInitFiles(cfg config.ProjectConfig, gen generator.Generator) (map[string]generator.FileDef, bool, error) {
+	data, err := generator.ResolveComposeData(cfg)
+	if err != nil {
+		return nil, false, fmt.Errorf("resolving configuration: %w", err)
+	}
+	filesToWrite := make(map[string]generator.FileDef)
+
+	projectConfig, err := config.RenderProjectFile(cfg)
+	if err != nil {
+		return nil, false, err
+	}
+	filesToWrite["dev-box.yaml"] = generator.FileDef{Content: projectConfig, Perm: 0644}
+
+	composeContent, err := generator.RenderCompose(data)
+	if err != nil {
+		return nil, false, fmt.Errorf("rendering compose: %w", err)
+	}
+	filesToWrite["docker-compose.yml"] = generator.FileDef{Content: composeContent, Perm: 0644}
+
+	needsEnv := cfg.Database != config.DatabaseNone || cfg.Monitoring || cfg.Backend != config.BackendNone
+	if needsEnv {
+		envContent, err := generator.RenderEnvFile(data)
+		if err != nil {
+			return nil, false, fmt.Errorf("rendering env file: %w", err)
+		}
+		filesToWrite[".env"] = generator.FileDef{Content: envContent, Perm: 0600}
+
+		envExampleContent, err := generator.RenderEnvExampleFile(data)
+		if err != nil {
+			return nil, false, fmt.Errorf("rendering env.example file: %w", err)
+		}
+		filesToWrite[".env.example"] = generator.FileDef{Content: envExampleContent, Perm: 0644}
+		filesToWrite[".gitignore"] = generator.FileDef{Content: generator.RenderGitignore(), Perm: 0644}
+	}
+
+	backendPort := 0
+	if backend, ok := registry.SupportedBackends[cfg.Backend]; ok {
+		backendPort = backend.InternalPort
+	}
+	frontendPort := 0
+	if frontend, ok := registry.SupportedFrontends[cfg.Frontend]; ok {
+		frontendPort = frontend.InternalPort
+	}
+
+	if cfg.Nginx && (cfg.Frontend != config.FrontendNone || cfg.Backend != config.BackendNone) {
+		nginxConf, err := generator.GenerateNginxConf(cfg, backendPort, frontendPort)
+		if err != nil {
+			return nil, false, fmt.Errorf("generating nginx conf: %w", err)
+		}
+		filesToWrite[filepath.Join("nginx", "nginx.conf")] = generator.FileDef{Content: nginxConf, Perm: 0644}
+	}
+
+	if cfg.Monitoring {
+		prometheus, err := generator.RenderPrometheusConfig(backendPort)
+		if err != nil {
+			return nil, false, fmt.Errorf("rendering Prometheus config: %w", err)
+		}
+		filesToWrite[filepath.Join("monitoring", "prometheus.yml")] = generator.FileDef{Content: prometheus, Perm: 0644}
+
+		datasource, err := generator.RenderGrafanaDatasource()
+		if err != nil {
+			return nil, false, fmt.Errorf("rendering Grafana datasource: %w", err)
+		}
+		filesToWrite[filepath.Join("monitoring", "grafana", "provisioning", "datasources", "prometheus.yml")] = generator.FileDef{Content: datasource, Perm: 0644}
+
+		promtail, err := generator.RenderPromtailConfig()
+		if err != nil {
+			return nil, false, fmt.Errorf("rendering Promtail config: %w", err)
+		}
+		filesToWrite[filepath.Join("monitoring", "promtail-config.yml")] = generator.FileDef{Content: promtail, Perm: 0644}
+	}
+
+	if cfg.CICD {
+		workflow, err := generator.GenerateCICD(cfg, backendPort, frontendPort)
+		if err != nil {
+			return nil, false, fmt.Errorf("generating CI workflow: %w", err)
+		}
+		filesToWrite[filepath.Join(".github", "workflows", "ci.yml")] = generator.FileDef{Content: workflow, Perm: 0644}
+	}
+
+	scaffoldFiles, err := gen.GenerateScaffold(cfg)
+	if err != nil {
+		return nil, false, fmt.Errorf("generating scaffold: %w", err)
+	}
+	for path, content := range scaffoldFiles {
+		filesToWrite[path] = content
+	}
+	return filesToWrite, needsEnv, nil
+}
+
+func writeInitJSONOutput(ctx context.Context, fileSystem fs.FileSystem, outputDir string, files map[string]generator.FileDef, cfg config.ProjectConfig, output io.Writer) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	prepared, _, err := prepareGeneratedFiles(fileSystem, outputDir, files)
+	if err != nil {
+		return err
+	}
+
+	paths := make([]string, 0, len(prepared))
+	for path := range prepared {
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+
+	response := initOutput{
+		Config: initOutputConfig{
+			Frontend:   cfg.Frontend,
+			Backend:    cfg.Backend,
+			Database:   cfg.Database,
+			Cache:      cfg.Cache,
+			Nginx:      cfg.Nginx,
+			LocalStack: cfg.LocalStack,
+			Monitoring: cfg.Monitoring,
+			CICD:       cfg.CICD,
+		},
+		OutputDir: outputDir,
+		DryRun:    true,
+		Files:     make([]initOutputFile, 0, len(paths)),
+	}
+	for _, path := range paths {
+		response.Files = append(response.Files, initOutputFile{
+			Path:    filepath.ToSlash(path),
+			Content: string(prepared[path].Data),
+			Perm:    fmt.Sprintf("%#o", prepared[path].Perm),
+		})
+	}
+
+	encoder := json.NewEncoder(output)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(response)
 }
