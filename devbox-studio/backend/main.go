@@ -112,7 +112,7 @@ func handleOptions(w http.ResponseWriter, r *http.Request) {
 
 func handlePreview(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		http.Error(w, "許可されていないメソッドです", http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -135,7 +135,7 @@ func handlePreview(w http.ResponseWriter, r *http.Request) {
 
 func handleGenerate(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		http.Error(w, "許可されていないメソッドです", http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -148,7 +148,7 @@ func handleGenerate(w http.ResponseWriter, r *http.Request) {
 		cfg.Project = "studio-sample"
 	}
 	if !projectNameRE.MatchString(cfg.Project) {
-		http.Error(w, "project must be 2-40 characters and contain only letters, numbers, underscores, or hyphens", http.StatusBadRequest)
+		http.Error(w, "プロジェクト名は2〜40文字で、英数字・アンダースコア・ハイフンのみ使用できます", http.StatusBadRequest)
 		return
 	}
 
@@ -179,7 +179,7 @@ func handleGenerate(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, generateResponse{
 		Path:      cleanOutput,
 		FileCount: count,
-		Message:   fmt.Sprintf("Generated %s inside %s", cfg.Project, cleanRoot),
+		Message:   fmt.Sprintf("%s を %s に生成しました", cfg.Project, cleanRoot),
 	})
 }
 
@@ -187,7 +187,7 @@ func readConfig(r *http.Request) (stackConfig, error) {
 	defer r.Body.Close()
 	var cfg stackConfig
 	if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
-		return cfg, fmt.Errorf("invalid JSON body")
+		return cfg, fmt.Errorf("JSON の形式が正しくありません")
 	}
 	if cfg.Frontend == "" {
 		cfg.Frontend = "react"
@@ -202,22 +202,22 @@ func readConfig(r *http.Request) (stackConfig, error) {
 		cfg.Cache = "none"
 	}
 	if !allowedFrontends[cfg.Frontend] {
-		return cfg, fmt.Errorf("unsupported frontend: %s", cfg.Frontend)
+		return cfg, fmt.Errorf("未対応のフロントエンドです: %s", cfg.Frontend)
 	}
 	if !allowedBackends[cfg.Backend] {
-		return cfg, fmt.Errorf("unsupported backend: %s", cfg.Backend)
+		return cfg, fmt.Errorf("未対応のバックエンドです: %s", cfg.Backend)
 	}
 	if !allowedDatabases[cfg.Database] {
-		return cfg, fmt.Errorf("unsupported database: %s", cfg.Database)
+		return cfg, fmt.Errorf("未対応のデータベースです: %s", cfg.Database)
 	}
 	if !allowedCaches[cfg.Cache] {
-		return cfg, fmt.Errorf("unsupported cache: %s", cfg.Cache)
+		return cfg, fmt.Errorf("未対応のキャッシュです: %s", cfg.Cache)
 	}
 	if cfg.Frontend == "none" && cfg.Backend == "none" && cfg.Database == "none" && cfg.Cache == "none" && !cfg.LocalStack && !cfg.Monitoring {
-		return cfg, fmt.Errorf("select at least one workload or addon")
+		return cfg, fmt.Errorf("少なくとも1つのワークロードまたは追加機能を選択してください")
 	}
 	if cfg.Nginx && cfg.Frontend == "none" && cfg.Backend == "none" {
-		return cfg, fmt.Errorf("nginx requires a frontend or backend")
+		return cfg, fmt.Errorf("nginx を使うにはフロントエンドまたはバックエンドが必要です")
 	}
 	return cfg, nil
 }
@@ -252,7 +252,7 @@ func runDevBoxPreview(ctx context.Context, cfg stackConfig) (previewResponse, er
 		return files[i].Kind < files[j].Kind
 	})
 	if len(files) == 0 {
-		return previewResponse{}, errors.New("dev-box returned no files to preview")
+		return previewResponse{}, errors.New("dev-box からプレビュー対象のファイルが返されませんでした")
 	}
 	return previewResponse{
 		Summary: summarize(cfg, len(files)),
@@ -317,7 +317,7 @@ func runDevBox(ctx context.Context, devBoxArgs []string, outputDir string) (stri
 		if msg == "" {
 			msg = err.Error()
 		}
-		return "", fmt.Errorf("dev-box failed: %s", msg)
+		return "", fmt.Errorf("dev-box の実行に失敗しました: %s", msg)
 	}
 	if outputDir != "" {
 		log.Printf("dev-box generated output at %s", outputDir)
@@ -341,7 +341,7 @@ func devBoxSourceDir() (string, error) {
 			return clean, nil
 		}
 	}
-	return "", errors.New("dev-box source directory was not found; set DEV_BOX_SOURCE_DIR")
+	return "", errors.New("dev-box のソースディレクトリが見つかりませんでした。DEV_BOX_SOURCE_DIR を設定してください")
 }
 
 func generatedOutputRoot() (string, error) {
@@ -369,7 +369,7 @@ func containedPaths(root, target string) (string, string, error) {
 		return "", "", err
 	}
 	if rel == "." || strings.HasPrefix(rel, "..") || filepath.IsAbs(rel) {
-		return "", "", errors.New("output path escapes the generated project directory")
+		return "", "", errors.New("出力先が生成プロジェクトディレクトリの外を指しています")
 	}
 	return cleanRoot, cleanTarget, nil
 }
@@ -401,24 +401,23 @@ func classifyFile(path string) string {
 	slash := filepath.ToSlash(path)
 	switch {
 	case strings.Contains(slash, "docker-compose"):
-		return "Compose"
+		return "Compose設定"
 	case strings.Contains(slash, ".github/workflows"):
 		return "CI"
 	case strings.Contains(slash, "k8s") || strings.Contains(slash, "terraform"):
-		return "Infrastructure"
+		return "インフラ"
 	case strings.Contains(slash, "frontend"):
-		return "Frontend"
+		return "フロントエンド"
 	case strings.Contains(slash, "backend"):
-		return "Backend"
+		return "バックエンド"
 	case strings.Contains(slash, "monitoring") || strings.Contains(slash, "nginx"):
-		return "Operations"
+		return "運用設定"
 	case strings.HasSuffix(slash, ".env") || strings.HasSuffix(slash, ".env.example"):
-		return "Environment"
+		return "環境変数"
 	default:
-		return "Project"
+		return "プロジェクト"
 	}
 }
-
 func summarize(cfg stackConfig, fileCount int) string {
 	addons := []string{}
 	if cfg.Nginx {
@@ -428,17 +427,45 @@ func summarize(cfg stackConfig, fileCount int) string {
 		addons = append(addons, "LocalStack")
 	}
 	if cfg.Monitoring {
-		addons = append(addons, "Monitoring")
+		addons = append(addons, "監視")
 	}
 	if cfg.CICD {
 		addons = append(addons, "CI")
 	}
 	if len(addons) == 0 {
-		addons = append(addons, "no addons")
+		addons = append(addons, "追加機能なし")
 	}
-	return fmt.Sprintf("%s frontend, %s backend, %s database, %s cache, %s: %d files", cfg.Frontend, cfg.Backend, cfg.Database, cfg.Cache, strings.Join(addons, ", "), fileCount)
+	return fmt.Sprintf("フロントエンド: %s / バックエンド: %s / データベース: %s / キャッシュ: %s / %s / 生成予定: %dファイル", displayStackValue(cfg.Frontend), displayStackValue(cfg.Backend), displayStackValue(cfg.Database), displayStackValue(cfg.Cache), strings.Join(addons, ", "), fileCount)
 }
 
+func displayStackValue(value string) string {
+	switch value {
+	case "react":
+		return "React"
+	case "vue":
+		return "Vue"
+	case "go":
+		return "Go"
+	case "node":
+		return "Node.js"
+	case "python":
+		return "Python"
+	case "php":
+		return "PHP"
+	case "java":
+		return "Java"
+	case "none":
+		return "なし"
+	case "postgres":
+		return "PostgreSQL"
+	case "mysql":
+		return "MySQL"
+	case "redis":
+		return "Redis"
+	default:
+		return value
+	}
+}
 func lineCount(content string) int {
 	if content == "" {
 		return 0

@@ -56,7 +56,7 @@ function App() {
     });
     if (!response.ok) {
       const text = await response.text();
-      throw new Error(text || `Request failed with ${response.status}`);
+      throw new Error(text || `リクエストに失敗しました: ${response.status}`);
     }
     return response.json();
   }
@@ -85,7 +85,7 @@ function App() {
     setMessage('');
     try {
       const data = await requestJSON('/api/generate', config);
-      setMessage(`${data.message}. ${data.fileCount} files written.`);
+      setMessage(`${data.message}。${data.fileCount}件のファイルを書き込みました。`);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -101,24 +101,23 @@ function App() {
     <main className="app-shell">
       <section className="hero">
         <div>
-          <p className="eyebrow">Built with dev-box</p>
+          <p className="eyebrow">dev-box で構築</p>
           <h1>DevBox Studio</h1>
           <p className="hero-copy">
-            Choose a stack, preview the files that dev-box will create, then generate
-            a ready-to-run project from the browser.
+            スタックを選び、dev-box が作成するファイルを確認してから、ブラウザからすぐ動かせるプロジェクトを生成できます。
           </p>
         </div>
-        <div className="hero-stats" aria-label="Current preview summary">
+        <div className="hero-stats" aria-label="現在のプレビュー概要">
           <span>{preview?.files?.length || 0}</span>
-          <small>generated files</small>
+          <small>生成予定ファイル</small>
         </div>
       </section>
 
       <section className="workspace">
-        <aside className="panel controls" aria-label="Stack controls">
+        <aside className="panel controls" aria-label="構成選択">
           <div className="panel-heading">
-            <h2>Stack</h2>
-            <p>Every preview is produced by the local dev-box CLI.</p>
+            <h2>構成</h2>
+            <p>プレビューはローカルの dev-box CLI から生成されます。</p>
           </div>
 
           <div className="control-grid">
@@ -136,7 +135,7 @@ function App() {
             ))}
           </div>
 
-          <div className="addons" aria-label="Add-ons">
+          <div className="addons" aria-label="追加機能">
             {['nginx', 'localstack', 'monitoring', 'cicd'].map((field) => (
               <label className="toggle" key={field}>
                 <input
@@ -150,7 +149,7 @@ function App() {
           </div>
 
           <label className="field">
-            <span>Output project</span>
+            <span>出力プロジェクト名</span>
             <input
               value={config.project}
               onChange={(event) => updateField('project', event.target.value)}
@@ -160,10 +159,10 @@ function App() {
 
           <div className="actions">
             <button className="primary" onClick={loadPreview} disabled={loading}>
-              {loading ? 'Previewing...' : 'Preview files'}
+              {loading ? 'プレビュー中...' : 'ファイルをプレビュー'}
             </button>
             <button className="secondary" onClick={generateProject} disabled={generating || loading}>
-              {generating ? 'Generating...' : 'Generate project'}
+              {generating ? '生成中...' : 'プロジェクトを生成'}
             </button>
           </div>
 
@@ -172,22 +171,22 @@ function App() {
           {error && <p className="status error">{error}</p>}
         </aside>
 
-        <section className="panel files" aria-label="Generated files preview">
+        <section className="panel files" aria-label="生成ファイルのプレビュー">
           <div className="panel-heading row">
             <div>
-              <h2>Preview</h2>
-              <p>{preview?.command?.join(' ') || 'Run a preview to see generated files.'}</p>
+              <h2>プレビュー</h2>
+              <p>{preview?.command?.join(' ') || 'プレビューを実行すると生成予定ファイルが表示されます。'}</p>
             </div>
             {selectedFile && (
               <div className="file-meta">
                 <strong>{selectedFile.lines}</strong>
-                <span>lines</span>
+                <span>行</span>
               </div>
             )}
           </div>
 
           <div className="preview-layout">
-            <nav className="file-list" aria-label="Generated file list">
+            <nav className="file-list" aria-label="生成ファイル一覧">
               {Object.entries(groupedFiles).map(([kind, files]) => (
                 <div className="file-group" key={kind}>
                   <h3>{kind}</h3>
@@ -217,7 +216,7 @@ function App() {
                   </pre>
                 </>
               ) : (
-                <div className="empty-state">No preview has been generated yet.</div>
+                <div className="empty-state">まだプレビューは生成されていません。</div>
               )}
             </article>
           </div>
@@ -229,10 +228,10 @@ function App() {
 
 function labelFor(field) {
   return {
-    frontend: 'Frontend',
-    backend: 'Backend',
-    database: 'Database',
-    cache: 'Cache',
+    frontend: 'フロントエンド',
+    backend: 'バックエンド',
+    database: 'データベース',
+    cache: 'キャッシュ',
   }[field];
 }
 
@@ -248,15 +247,15 @@ function display(value) {
     postgres: 'PostgreSQL',
     mysql: 'MySQL',
     redis: 'Redis',
-    none: 'None',
+    none: 'なし',
   }[value] || value;
 }
 
 function addonLabel(value) {
   return {
-    nginx: 'Nginx reverse proxy',
+    nginx: 'Nginx リバースプロキシ',
     localstack: 'LocalStack',
-    monitoring: 'Prometheus / Grafana',
+    monitoring: 'Prometheus / Grafana 監視',
     cicd: 'GitHub Actions',
   }[value];
 }
