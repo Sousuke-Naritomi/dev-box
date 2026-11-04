@@ -35,6 +35,9 @@ func ParseProjectFile(data []byte) (ProjectConfig, error) {
 	if err := file.Validate(); err != nil {
 		return ProjectConfig{}, fmt.Errorf("validating project configuration: %w", err)
 	}
+	if file.Cloud == "" {
+		file.Cloud = CloudNone
+	}
 	return file.ProjectConfig, nil
 }
 
@@ -52,6 +55,9 @@ func ensureSingleYAMLDocument(decoder *yaml.Decoder) error {
 // stack. Runtime-only options such as Force are intentionally omitted.
 func RenderProjectFile(cfg ProjectConfig) (string, error) {
 	cfg.Force = false
+	if cfg.Cloud == "" {
+		cfg.Cloud = CloudNone
+	}
 	data, err := yaml.Marshal(ProjectFile{Version: ProjectFileVersion, ProjectConfig: cfg})
 	if err != nil {
 		return "", fmt.Errorf("encoding project configuration: %w", err)

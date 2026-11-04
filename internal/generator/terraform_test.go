@@ -3,12 +3,14 @@ package generator
 import (
 	"strings"
 	"testing"
+
+	"github.com/Sousuke-Naritomi/dev-box/internal/config"
 )
 
 func TestGeneratedTerraformUsesCanonicalIndentation(t *testing.T) {
 	for _, provider := range []string{"aws", "gcp", "azure"} {
 		t.Run(provider, func(t *testing.T) {
-			files, err := GenerateTerraform(provider)
+			files, err := GenerateTerraform(provider, config.ProjectConfig{})
 			if err != nil {
 				t.Fatalf("GenerateTerraform failed: %v", err)
 			}
@@ -22,7 +24,7 @@ func TestGeneratedTerraformUsesCanonicalIndentation(t *testing.T) {
 }
 
 func TestGenerateTerraform_AWS(t *testing.T) {
-	files, err := GenerateTerraform("aws")
+	files, err := GenerateTerraform("aws", config.ProjectConfig{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -84,7 +86,7 @@ func TestGenerateTerraform_AWS(t *testing.T) {
 }
 
 func TestGenerateTerraform_GCP(t *testing.T) {
-	files, err := GenerateTerraform("gcp")
+	files, err := GenerateTerraform("gcp", config.ProjectConfig{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -108,7 +110,7 @@ func TestGenerateTerraform_GCP(t *testing.T) {
 
 func TestGenerateTerraform_Azure(t *testing.T) {
 	t.Run("Azure", func(t *testing.T) {
-		files, err := GenerateTerraform("azure")
+		files, err := GenerateTerraform("azure", config.ProjectConfig{})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -120,7 +122,7 @@ func TestGenerateTerraform_Azure(t *testing.T) {
 		}
 	})
 
-	files, err := GenerateTerraform("azure")
+	files, err := GenerateTerraform("azure", config.ProjectConfig{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -149,7 +151,7 @@ func TestGenerateTerraform_Azure(t *testing.T) {
 }
 
 func TestGenerateTerraform_Invalid(t *testing.T) {
-	_, err := GenerateTerraform("invalid")
+	_, err := GenerateTerraform("invalid", config.ProjectConfig{})
 	if err == nil {
 		t.Error("expected error for invalid provider")
 	}

@@ -26,7 +26,7 @@ data "aws_ami" "ubuntu" {
 }
 
 resource "aws_security_group" "devbox" {
-  name        = "devbox-sg"
+  name        = "${var.name_prefix}-sg"
   description = "Security group for dev-box instance"
 
   dynamic "ingress" {
@@ -107,7 +107,8 @@ resource "aws_instance" "devbox" {
   EOF
 
   tags = {
-    Name = "devbox-instance"
+    Name  = "${var.name_prefix}-instance"
+    Stack = "{{ .Stack }}"
   }
 }
 

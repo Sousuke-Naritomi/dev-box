@@ -42,6 +42,13 @@ func applyCoreFlags(cmd *cobra.Command, cfg *config.ProjectConfig) {
 	}
 }
 
+func applyCloudFlag(cmd *cobra.Command, cfg *config.ProjectConfig) {
+	if cmd.Flags().Changed("cloud") {
+		value, _ := cmd.Flags().GetString("cloud")
+		cfg.Cloud = config.CloudProvider(value)
+	}
+}
+
 func applyAddonFlags(cmd *cobra.Command, cfg *config.ProjectConfig) {
 	if cmd.Flags().Changed("nginx") {
 		cfg.Nginx, _ = cmd.Flags().GetBool("nginx")

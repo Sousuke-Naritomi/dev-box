@@ -13,26 +13,26 @@ provider "azurerm" {
 }
 
 resource "azurerm_resource_group" "devbox" {
-  name     = "devbox-rg"
+  name     = "${var.name_prefix}-rg"
   location = var.location
 }
 
 resource "azurerm_virtual_network" "devbox" {
-  name                = "devbox-vnet"
+  name                = "${var.name_prefix}-vnet"
   address_space       = ["10.0.0.0/16"]
   location            = azurerm_resource_group.devbox.location
   resource_group_name = azurerm_resource_group.devbox.name
 }
 
 resource "azurerm_subnet" "devbox" {
-  name                 = "devbox-subnet"
+  name                 = "${var.name_prefix}-subnet"
   resource_group_name  = azurerm_resource_group.devbox.name
   virtual_network_name = azurerm_virtual_network.devbox.name
   address_prefixes     = ["10.0.1.0/24"]
 }
 
 resource "azurerm_network_security_group" "devbox" {
-  name                = "devbox-nsg"
+  name                = "${var.name_prefix}-nsg"
   location            = azurerm_resource_group.devbox.location
   resource_group_name = azurerm_resource_group.devbox.name
 
@@ -68,14 +68,14 @@ resource "azurerm_network_security_group" "devbox" {
 }
 
 resource "azurerm_public_ip" "devbox" {
-  name                = "devbox-pip"
+  name                = "${var.name_prefix}-pip"
   location            = azurerm_resource_group.devbox.location
   resource_group_name = azurerm_resource_group.devbox.name
   allocation_method   = "Dynamic"
 }
 
 resource "azurerm_network_interface" "devbox" {
-  name                = "devbox-nic"
+  name                = "${var.name_prefix}-nic"
   location            = azurerm_resource_group.devbox.location
   resource_group_name = azurerm_resource_group.devbox.name
 
@@ -93,10 +93,10 @@ resource "azurerm_network_interface_security_group_association" "devbox" {
 }
 
 resource "azurerm_linux_virtual_machine" "devbox" {
-  name                = "devbox-vm"
+  name                = "${var.name_prefix}-vm"
   resource_group_name = azurerm_resource_group.devbox.name
   location            = azurerm_resource_group.devbox.location
-  size                = "Standard_B1s"
+  size                = var.vm_size
   admin_username      = var.admin_username
   secure_boot_enabled = true
   vtpm_enabled        = true
@@ -120,6 +120,10 @@ resource "azurerm_linux_virtual_machine" "devbox" {
     offer     = "0001-com-ubuntu-server-jammy"
     sku       = "22_04-lts"
     version   = "latest"
+  }
+
+  tags = {
+    stack = "{{ .Stack }}"
   }
 
   custom_data = base64encode(<<-EOF

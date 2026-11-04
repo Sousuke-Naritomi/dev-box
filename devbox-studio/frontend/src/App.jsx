@@ -6,6 +6,7 @@ const options = {
   backend: ['go', 'node', 'python', 'php', 'java', 'none'],
   database: ['postgres', 'mysql', 'none'],
   cache: ['redis', 'none'],
+  cloud: ['none', 'aws', 'gcp', 'azure'],
 };
 
 const defaultConfig = {
@@ -17,6 +18,7 @@ const defaultConfig = {
   localstack: false,
   monitoring: true,
   cicd: true,
+  cloud: 'none',
   project: 'studio-sample',
 };
 
@@ -232,6 +234,7 @@ function labelFor(field) {
     backend: 'バックエンド',
     database: 'データベース',
     cache: 'キャッシュ',
+    cloud: 'クラウド (Terraform)',
   }[field];
 }
 
@@ -247,6 +250,9 @@ function display(value) {
     postgres: 'PostgreSQL',
     mysql: 'MySQL',
     redis: 'Redis',
+    aws: 'AWS',
+    gcp: 'Google Cloud',
+    azure: 'Azure',
     none: 'なし',
   }[value] || value;
 }

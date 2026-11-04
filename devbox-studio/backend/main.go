@@ -8,13 +8,17 @@ import (
 	"fmt"
 	"io/fs"
 	"log"
+	"mime"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -27,6 +31,7 @@ type stackConfig struct {
 	LocalStack bool   `json:"localstack"`
 	Monitoring bool   `json:"monitoring"`
 	CICD       bool   `json:"cicd"`
+	Cloud      string `json:"cloud"`
 	Project    string `json:"project"`
 }
 
@@ -63,7 +68,15 @@ var (
 	allowedBackends  = map[string]bool{"node": true, "python": true, "go": true, "php": true, "java": true, "none": true}
 	allowedDatabases = map[string]bool{"mysql": true, "postgres": true, "none": true}
 	allowedCaches    = map[string]bool{"redis": true, "none": true}
+	allowedClouds    = map[string]bool{"aws": true, "gcp": true, "azure": true, "none": true}
 	projectNameRE    = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]{1,39}$`)
+)
+
+const maxRequestBytes = 64 << 10
+
+var (
+	runDevBoxFn = runDevBox
+	generateMu  sync.Mutex
 )
 
 func main() {
@@ -71,7 +84,24 @@ func main() {
 	if port == "" {
 		port = "8080"
 	}
+	host := os.Getenv("BACKEND_HOST")
+	if host == "" {
+		host = "127.0.0.1"
+	}
 
+	server := &http.Server{
+		Addr:              net.JoinHostPort(host, port),
+		Handler:           newHandler(),
+		ReadHeaderTimeout: 10 * time.Second,
+		WriteTimeout:      90 * time.Second,
+	}
+	log.Printf("DevBox Studio API listening on %s", server.Addr)
+	if err := server.ListenAndServe(); err != nil {
+		log.Fatalf("server failed: %v", err)
+	}
+}
+
+func newHandler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", handleRoot)
 	mux.HandleFunc("/health", handleHealth)
@@ -79,12 +109,7 @@ func main() {
 	mux.HandleFunc("/api/options", handleOptions)
 	mux.HandleFunc("/api/preview", handlePreview)
 	mux.HandleFunc("/api/generate", handleGenerate)
-
-	handler := withCORS(mux)
-	log.Printf("DevBox Studio API listening on :%s", port)
-	if err := http.ListenAndServe(":"+port, handler); err != nil {
-		log.Fatalf("server failed: %v", err)
-	}
+	return withLocalOnly(mux)
 }
 
 func handleRoot(w http.ResponseWriter, r *http.Request) {
@@ -106,6 +131,7 @@ func handleOptions(w http.ResponseWriter, r *http.Request) {
 		"backends":  []string{"go", "node", "python", "php", "java", "none"},
 		"databases": []string{"postgres", "mysql", "none"},
 		"caches":    []string{"redis", "none"},
+		"clouds":    []string{"none", "aws", "gcp", "azure"},
 		"addons":    []string{"nginx", "localstack", "monitoring", "cicd"},
 	})
 }
@@ -116,7 +142,7 @@ func handlePreview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cfg, err := readConfig(r)
+	cfg, err := readConfig(w, r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -139,7 +165,7 @@ func handleGenerate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cfg, err := readConfig(r)
+	cfg, err := readConfig(w, r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -167,6 +193,8 @@ func handleGenerate(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
 	defer cancel()
 
+	generateMu.Lock()
+	defer generateMu.Unlock()
 	if err := runDevBoxGenerate(ctx, cfg, cleanOutput); err != nil {
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
@@ -183,9 +211,13 @@ func handleGenerate(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func readConfig(r *http.Request) (stackConfig, error) {
-	defer r.Body.Close()
+func readConfig(w http.ResponseWriter, r *http.Request) (stackConfig, error) {
 	var cfg stackConfig
+	if mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type")); err != nil || mediaType != "application/json" {
+		return cfg, errors.New("リクエストの Content-Type は application/json にしてください")
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBytes)
+	defer r.Body.Close()
 	if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
 		return cfg, fmt.Errorf("JSON の形式が正しくありません")
 	}
@@ -201,6 +233,9 @@ func readConfig(r *http.Request) (stackConfig, error) {
 	if cfg.Cache == "" {
 		cfg.Cache = "none"
 	}
+	if cfg.Cloud == "" {
+		cfg.Cloud = "none"
+	}
 	if !allowedFrontends[cfg.Frontend] {
 		return cfg, fmt.Errorf("未対応のフロントエンドです: %s", cfg.Frontend)
 	}
@@ -212,6 +247,9 @@ func readConfig(r *http.Request) (stackConfig, error) {
 	}
 	if !allowedCaches[cfg.Cache] {
 		return cfg, fmt.Errorf("未対応のキャッシュです: %s", cfg.Cache)
+	}
+	if !allowedClouds[cfg.Cloud] {
+		return cfg, fmt.Errorf("未対応のクラウドです: %s", cfg.Cloud)
 	}
 	if cfg.Frontend == "none" && cfg.Backend == "none" && cfg.Database == "none" && cfg.Cache == "none" && !cfg.LocalStack && !cfg.Monitoring {
 		return cfg, fmt.Errorf("少なくとも1つのワークロードまたは追加機能を選択してください")
@@ -225,7 +263,7 @@ func readConfig(r *http.Request) (stackConfig, error) {
 func runDevBoxPreview(ctx context.Context, cfg stackConfig) (previewResponse, error) {
 	outputName := "studio-preview"
 	args := devBoxArgs(cfg, true, outputName)
-	raw, err := runDevBox(ctx, args, "")
+	raw, err := runDevBoxFn(ctx, args, "")
 	if err != nil {
 		return previewResponse{}, err
 	}
@@ -263,7 +301,7 @@ func runDevBoxPreview(ctx context.Context, cfg stackConfig) (previewResponse, er
 
 func runDevBoxGenerate(ctx context.Context, cfg stackConfig, outputDir string) error {
 	args := devBoxArgs(cfg, false, outputDir)
-	_, err := runDevBox(ctx, args, outputDir)
+	_, err := runDevBoxFn(ctx, args, outputDir)
 	return err
 }
 
@@ -288,6 +326,9 @@ func devBoxArgs(cfg stackConfig, dryRun bool, outputDir string) []string {
 	}
 	if cfg.CICD {
 		args = append(args, "--cicd")
+	}
+	if cfg.Cloud != "" && cfg.Cloud != "none" {
+		args = append(args, "--cloud", cfg.Cloud)
 	}
 	if dryRun {
 		args = append(args, "--dry-run", "--format", "json")
@@ -330,10 +371,7 @@ func devBoxSourceDir() (string, error) {
 	if env := os.Getenv("DEV_BOX_SOURCE_DIR"); env != "" {
 		candidates = append(candidates, env)
 	}
-	candidates = append(candidates,
-		`C:\Job hunting\dev-box`,
-		filepath.Join("..", "..", "dev-box"),
-	)
+	candidates = append(candidates, filepath.Join("..", ".."))
 
 	for _, candidate := range candidates {
 		clean := filepath.Clean(candidate)
@@ -368,7 +406,7 @@ func containedPaths(root, target string) (string, string, error) {
 	if err != nil {
 		return "", "", err
 	}
-	if rel == "." || strings.HasPrefix(rel, "..") || filepath.IsAbs(rel) {
+	if rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.IsAbs(rel) {
 		return "", "", errors.New("出力先が生成プロジェクトディレクトリの外を指しています")
 	}
 	return cleanRoot, cleanTarget, nil
@@ -432,6 +470,9 @@ func summarize(cfg stackConfig, fileCount int) string {
 	if cfg.CICD {
 		addons = append(addons, "CI")
 	}
+	if cfg.Cloud != "" && cfg.Cloud != "none" {
+		addons = append(addons, "Terraform ("+displayStackValue(cfg.Cloud)+")")
+	}
 	if len(addons) == 0 {
 		addons = append(addons, "追加機能なし")
 	}
@@ -462,6 +503,12 @@ func displayStackValue(value string) string {
 		return "MySQL"
 	case "redis":
 		return "Redis"
+	case "aws":
+		return "AWS"
+	case "gcp":
+		return "GCP"
+	case "azure":
+		return "Azure"
 	default:
 		return value
 	}
@@ -493,15 +540,32 @@ func writeJSON(w http.ResponseWriter, status int, value any) {
 	_ = json.NewEncoder(w).Encode(value)
 }
 
-func withCORS(next http.Handler) http.Handler {
+func withLocalOnly(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-		if r.Method == http.MethodOptions {
-			w.WriteHeader(http.StatusNoContent)
+		if !isLoopbackHost(r.Host) {
+			http.Error(w, "ローカルホスト以外からのアクセスは許可されていません", http.StatusForbidden)
 			return
+		}
+		if origin := r.Header.Get("Origin"); origin != "" {
+			parsed, err := url.Parse(origin)
+			if err != nil || !isLoopbackHost(parsed.Host) {
+				http.Error(w, "許可されていないオリジンです", http.StatusForbidden)
+				return
+			}
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+func isLoopbackHost(hostport string) bool {
+	host := hostport
+	if h, _, err := net.SplitHostPort(hostport); err == nil {
+		host = h
+	}
+	host = strings.Trim(host, "[]")
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }

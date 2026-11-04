@@ -4,10 +4,21 @@ variable "region" {
   default     = "ap-northeast-1"
 }
 
-variable "instance_type" {
-  description = "EC2 instance type"
+variable "name_prefix" {
+  description = "Prefix for resource names; change it to run several environments side by side"
   type        = string
-  default     = "t3.micro"
+  default     = "devbox"
+
+  validation {
+    condition     = can(regex("^[a-z][a-z0-9-]{1,20}$", var.name_prefix))
+    error_message = "name_prefix must start with a lowercase letter and contain only lowercase letters, digits and hyphens (2-21 characters)."
+  }
+}
+
+variable "instance_type" {
+  description = "EC2 instance type, sized for the selected stack"
+  type        = string
+  default     = "{{ .InstanceType }}"
 }
 
 variable "key_name" {

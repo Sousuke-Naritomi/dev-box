@@ -1,0 +1,6 @@
+# Generator templates are embedded into the binary, so their line endings decide
+# the line endings of every generated file. Pin LF so output is identical no
+# matter how the repository was checked out (for example Windows autocrlf).
+* text=auto eol=lf
+*.png binary
+*.exe binary

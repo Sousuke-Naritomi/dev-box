@@ -36,6 +36,7 @@ func init() {
 	initCmd.Flags().Bool("localstack", false, "Include LocalStack")
 	initCmd.Flags().Bool("monitoring", false, "Include Monitoring (Prometheus + Grafana + Loki)")
 	initCmd.Flags().Bool("cicd", false, "Include CI/CD Pipeline")
+	initCmd.Flags().String("cloud", "", "Also generate Terraform for a cloud provider (aws, gcp, azure, none)")
 	initCmd.Flags().String("config", "", "Path to a dev-box.yaml project configuration")
 	initCmd.Flags().Bool("force", false, "Overwrite existing files without prompting")
 	initCmd.Flags().Bool("dry-run", false, "Print generated files without writing them")
@@ -52,8 +53,10 @@ func runInit(cmd *cobra.Command, args []string) error {
 	}
 	applyCoreFlags(cmd, &cfg)
 	applyAddonFlags(cmd, &cfg)
+	applyCloudFlag(cmd, &cfg)
 	cfg.Force, _ = cmd.Flags().GetBool("force")
 
+	cloud := string(cfg.Cloud)
 	frontend := string(cfg.Frontend)
 	backend := string(cfg.Backend)
 	database := string(cfg.Database)
@@ -109,6 +112,14 @@ func runInit(cmd *cobra.Command, args []string) error {
 		if configPath == "" && !cmd.Flags().Changed("cicd") {
 			fields = append(fields, huh.NewConfirm().Title("Include CI/CD Pipeline? (GitHub Actions)").Value(&cfg.CICD))
 		}
+		if configPath == "" && !cmd.Flags().Changed("cloud") {
+			fields = append(fields, huh.NewSelect[string]().Title("Generate Terraform for a cloud provider?").Options(
+				huh.NewOption("No", "none"),
+				huh.NewOption("AWS", "aws"),
+				huh.NewOption("GCP", "gcp"),
+				huh.NewOption("Azure", "azure"),
+			).Value(&cloud))
+		}
 
 		if err := huh.NewForm(huh.NewGroup(fields...)).Run(); err != nil {
 			return fmt.Errorf("form cancelled: %w", err)
@@ -117,6 +128,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 		cfg.Backend = config.BackendType(backend)
 		cfg.Database = config.DatabaseType(database)
 		cfg.Cache = config.CacheType(cache)
+		cfg.Cloud = config.CloudProvider(cloud)
 	}
 
 	if err := cfg.Validate(); err != nil {
@@ -135,14 +147,15 @@ type initOutputFile struct {
 }
 
 type initOutputConfig struct {
-	Frontend   config.FrontendType `json:"frontend"`
-	Backend    config.BackendType  `json:"backend"`
-	Database   config.DatabaseType `json:"database"`
-	Cache      config.CacheType    `json:"cache"`
-	Nginx      bool                `json:"nginx"`
-	LocalStack bool                `json:"localstack"`
-	Monitoring bool                `json:"monitoring"`
-	CICD       bool                `json:"cicd"`
+	Frontend   config.FrontendType  `json:"frontend"`
+	Backend    config.BackendType   `json:"backend"`
+	Database   config.DatabaseType  `json:"database"`
+	Cache      config.CacheType     `json:"cache"`
+	Nginx      bool                 `json:"nginx"`
+	LocalStack bool                 `json:"localstack"`
+	Monitoring bool                 `json:"monitoring"`
+	CICD       bool                 `json:"cicd"`
+	Cloud      config.CloudProvider `json:"cloud"`
 }
 
 type initOutput struct {
@@ -197,6 +210,11 @@ func runInitLogic(ctx context.Context, cfg config.ProjectConfig, outputDir strin
 	}
 	if cfg.CICD {
 		if err := writeCommandOutput(output, "Generated .github/workflows/ci.yml.\n"); err != nil {
+			return err
+		}
+	}
+	if cfg.HasCloud() {
+		if err := writeCommandOutput(output, "Generated Terraform for %s in terraform/. Copy terraform.tfvars.example to terraform.tfvars, review it, then run terraform init and terraform plan.\n", cfg.Cloud); err != nil {
 			return err
 		}
 	}
@@ -290,7 +308,24 @@ func buildInitFiles(cfg config.ProjectConfig, gen generator.Generator) (map[stri
 	for path, content := range scaffoldFiles {
 		filesToWrite[path] = content
 	}
+
+	if cfg.HasCloud() {
+		terraformFiles, err := gen.GenerateTerraform(string(cfg.Cloud), cfg)
+		if err != nil {
+			return nil, false, fmt.Errorf("generating terraform: %w", err)
+		}
+		for name, content := range terraformFiles {
+			filesToWrite[filepath.Join("terraform", name)] = content
+		}
+	}
 	return filesToWrite, needsEnv, nil
+}
+
+func normalizedCloud(cloud config.CloudProvider) config.CloudProvider {
+	if cloud == "" {
+		return config.CloudNone
+	}
+	return cloud
 }
 
 func writeInitJSONOutput(ctx context.Context, fileSystem fs.FileSystem, outputDir string, files map[string]generator.FileDef, cfg config.ProjectConfig, output io.Writer) error {
@@ -318,6 +353,7 @@ func writeInitJSONOutput(ctx context.Context, fileSystem fs.FileSystem, outputDi
 			LocalStack: cfg.LocalStack,
 			Monitoring: cfg.Monitoring,
 			CICD:       cfg.CICD,
+			Cloud:      normalizedCloud(cfg.Cloud),
 		},
 		OutputDir: outputDir,
 		DryRun:    true,
