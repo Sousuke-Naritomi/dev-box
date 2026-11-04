@@ -13,6 +13,7 @@ type cicdData struct {
 	BackendPort  int
 	HasFrontend  bool
 	FrontendPort int
+	TrivyVersion string
 }
 
 // GenerateCICD returns the GitHub Actions CI/CD workflow YAML content.
@@ -28,6 +29,7 @@ func GenerateCICD(cfg config.ProjectConfig, backendPort, frontendPort int) (stri
 		BackendPort:  backendPort,
 		HasFrontend:  cfg.Frontend != config.FrontendNone && cfg.Frontend != "",
 		FrontendPort: frontendPort,
+		TrivyVersion: config.VersionTrivy,
 	}
 	if err := tmpl.Execute(&buf, data); err != nil {
 		return "", fmt.Errorf("executing cicd template: %w", err)

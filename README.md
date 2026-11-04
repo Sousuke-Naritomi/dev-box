@@ -466,7 +466,7 @@ Terraform の対象は VM、基本ネットワーク、Docker のインストー
 `--cicd` を指定すると、生成先プロジェクトに次の検証を行うワークフローを追加します。
 
 - Docker Compose 設定の検証
-- Trivy による `CRITICAL` / `HIGH` 脆弱性スキャン
+- Trivy による `CRITICAL` / `HIGH` 脆弱性スキャン（Trivy は GitHub のリリースから取得し、チェックサムを検証して導入します）
 - サービスの実起動
 - コンテナ状態、health check、HTTP 応答の確認
 - 失敗時のログ出力と終了時の後片付け
