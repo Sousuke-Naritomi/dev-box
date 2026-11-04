@@ -5,7 +5,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/api': 'http://127.0.0.1:8080',
+      '/api': process.env.STUDIO_API_URL || 'http://127.0.0.1:8080',
     },
   },
 });

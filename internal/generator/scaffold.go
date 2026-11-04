@@ -18,19 +18,23 @@ func GenerateScaffold(cfg config.ProjectConfig) (map[string]FileDef, error) {
 	files := make(map[string]FileDef)
 
 	templateData := struct {
-		VersionNode   string
-		VersionPython string
-		VersionGo     string
-		VersionPHP    string
-		VersionJava   string
-		VersionNginx  string
+		VersionNode        string
+		VersionPython      string
+		VersionGo          string
+		VersionPHP         string
+		VersionJava        string
+		VersionNginx       string
+		VersionJavaRuntime string
+		GoModVersion       string
 	}{
-		VersionNode:   config.VersionNode,
-		VersionPython: config.VersionPython,
-		VersionGo:     config.VersionGo,
-		VersionPHP:    config.VersionPHP,
-		VersionJava:   config.VersionJava,
-		VersionNginx:  config.VersionNginx,
+		VersionNode:        config.VersionNode,
+		VersionPython:      config.VersionPython,
+		VersionGo:          config.VersionGo,
+		VersionPHP:         config.VersionPHP,
+		VersionJava:        config.VersionJava,
+		VersionNginx:       config.VersionNginx,
+		VersionJavaRuntime: javaRuntimeVersion(config.VersionJava),
+		GoModVersion:       goModVersion(config.VersionGo),
 	}
 
 	if frontend, ok := registry.SupportedFrontends[cfg.Frontend]; ok {
@@ -50,6 +54,18 @@ func GenerateScaffold(cfg config.ProjectConfig) (map[string]FileDef, error) {
 	}
 
 	return files, nil
+}
+
+// javaRuntimeVersion maps a JDK image tag (17-jdk) to its JRE counterpart
+// (17-jre) so the runtime stage can never be older than the build stage.
+func javaRuntimeVersion(jdkTag string) string {
+	return strings.Replace(jdkTag, "jdk", "jre", 1)
+}
+
+// goModVersion maps an image tag such as 1.26-alpine to the go.mod directive (1.26).
+func goModVersion(imageTag string) string {
+	version, _, _ := strings.Cut(imageTag, "-")
+	return version
 }
 
 func copyScaffoldFiles(templateDir string, destPrefix string, data any, out map[string]FileDef) error {

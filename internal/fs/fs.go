@@ -7,6 +7,12 @@ import (
 	"sort"
 )
 
+// Seams so tests can inject mid-commit failures.
+var (
+	renameFile = os.Rename
+	chmodFile  = os.Chmod
+)
+
 type File struct {
 	Data []byte
 	Perm os.FileMode
@@ -104,7 +110,7 @@ func (fs *OSFileSystem) WriteFiles(files map[string]File) error {
 		for i := len(staged) - 1; i >= 0; i-- {
 			if staged[i].backup != "" {
 				_ = os.Remove(staged[i].target)
-				_ = os.Rename(staged[i].backup, staged[i].target)
+				_ = renameFile(staged[i].backup, staged[i].target)
 				staged[i].backup = ""
 			}
 		}
@@ -128,7 +134,7 @@ func (fs *OSFileSystem) WriteFiles(files map[string]File) error {
 				restoreBackups()
 				return fmt.Errorf("preparing backup path for %s: %w", file.target, err)
 			}
-			if err := os.Rename(file.target, backupPath); err != nil {
+			if err := renameFile(file.target, backupPath); err != nil {
 				restoreBackups()
 				return fmt.Errorf("backing up %s: %w", file.target, err)
 			}
@@ -146,7 +152,7 @@ func (fs *OSFileSystem) WriteFiles(files map[string]File) error {
 
 	for i := range staged {
 		file := &staged[i]
-		if err := os.Rename(file.stage, file.target); err != nil {
+		if err := renameFile(file.stage, file.target); err != nil {
 			rollback()
 			return fmt.Errorf("replacing %s: %w", file.target, err)
 		}
@@ -156,7 +162,7 @@ func (fs *OSFileSystem) WriteFiles(files map[string]File) error {
 
 	for i := range staged {
 		file := &staged[i]
-		if err := os.Chmod(file.target, file.perm); err != nil {
+		if err := chmodFile(file.target, file.perm); err != nil {
 			rollback()
 			return fmt.Errorf("setting final permissions for %s: %w", file.target, err)
 		}

@@ -27,20 +27,30 @@ const (
 
 	CacheRedis CacheType = "redis"
 	CacheNone  CacheType = "none"
+
+	CloudAWS   CloudProvider = "aws"
+	CloudGCP   CloudProvider = "gcp"
+	CloudAzure CloudProvider = "azure"
+	CloudNone  CloudProvider = "none"
 )
+
+// CloudProvider selects the Terraform target. The empty value means none so
+// that project files written before this option existed keep working.
+type CloudProvider string
 
 // ProjectConfig holds all user selections for environment generation.
 // Each field corresponds to a prompt in the interactive setup wizard.
 type ProjectConfig struct {
-	Frontend   FrontendType `yaml:"frontend"`
-	Backend    BackendType  `yaml:"backend"`
-	Database   DatabaseType `yaml:"database"`
-	Cache      CacheType    `yaml:"cache"`
-	Nginx      bool         `yaml:"nginx"`
-	LocalStack bool         `yaml:"localstack"`
-	Monitoring bool         `yaml:"monitoring"`
-	CICD       bool         `yaml:"cicd"`
-	Force      bool         `yaml:"-"` // Skip overwrite prompts; never persisted.
+	Frontend   FrontendType  `yaml:"frontend"`
+	Backend    BackendType   `yaml:"backend"`
+	Database   DatabaseType  `yaml:"database"`
+	Cache      CacheType     `yaml:"cache"`
+	Nginx      bool          `yaml:"nginx"`
+	LocalStack bool          `yaml:"localstack"`
+	Monitoring bool          `yaml:"monitoring"`
+	CICD       bool          `yaml:"cicd"`
+	Cloud      CloudProvider `yaml:"cloud"`
+	Force      bool          `yaml:"-"` // Skip overwrite prompts; never persisted.
 }
 
 // Validate checks if the configuration values are valid.
@@ -56,7 +66,19 @@ func (c *ProjectConfig) Validate() error {
 		return fmt.Errorf("nginx requires a frontend or backend service")
 	}
 
+	switch c.Cloud {
+	case "", CloudNone, CloudAWS, CloudGCP, CloudAzure:
+		// valid
+	default:
+		return fmt.Errorf("unsupported cloud provider: %q (supported: aws, gcp, azure, none)", c.Cloud)
+	}
+
 	return nil
+}
+
+// HasCloud reports whether Terraform files should be generated.
+func (c ProjectConfig) HasCloud() bool {
+	return c.Cloud != "" && c.Cloud != CloudNone
 }
 
 // ValidateSelection checks the core stack values without considering addons.

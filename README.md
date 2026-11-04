@@ -40,7 +40,7 @@
 - MySQL/PostgreSQL、Redis、Nginx、LocalStack の追加
 - Prometheus、Grafana、Loki、Promtail の監視構成生成
 - Kubernetes の Deployment、Service、PVC、NetworkPolicy 生成
-- AWS、GCP、Azure 向け Terraform 構成生成
+- AWS、GCP、Azure 向け Terraform 構成生成（選択したスタックに合わせたサイズとタグ付き）
 - GitHub Actions ワークフロー生成
 - 既存ファイル保護、dry-run、出力先指定、アトミックなファイル更新
 
@@ -173,7 +173,7 @@ dev-box stop
 
 ## DevBox Studio
 
-DevBox Studio は、`dev-box` をブラウザから操作するための補助アプリケーションです。技術スタックを選択すると、生成されるファイルを事前に確認でき、そのままプロジェクトを作成できます。
+DevBox Studio は、`dev-box` をブラウザから操作するための補助アプリケーションです。技術スタックを選択すると、生成されるファイルを事前に確認でき、そのままプロジェクトを作成できます。クラウド（Terraform）も選べ、`terraform/` 配下のファイルもプレビューできます。
 
 ![DevBox Studio のメイン画面](docs/images/devbox-studio-main.png)
 
@@ -202,6 +202,7 @@ dev-box init \
   --nginx \
   --monitoring \
   --cicd \
+  --cloud aws \
   --output-dir ./my-app
 ```
 
@@ -212,6 +213,7 @@ frontend: react | vue | none
 backend:  node | python | go | php | java | none
 database: mysql | postgres | none
 cache:    redis | none
+cloud:    aws | gcp | azure | none   （省略可。既定値は none）
 ```
 
 すべてが `none` で、LocalStack と Monitoring も無効な空構成は拒否されます。また、Nginx を使用する場合は Frontend または Backend が必要です。
@@ -230,7 +232,10 @@ nginx: true
 localstack: false
 monitoring: true
 cicd: true
+cloud: aws
 ```
+
+`cloud` は省略でき、省略した場合は `none`（Terraform を生成しない）として扱われます。以前に作成した `dev-box.yaml` もそのまま使えます。
 
 このファイルから同じ環境を再生成できます。
 
@@ -257,7 +262,7 @@ dev-box init --config dev-box.yaml --backend python --monitoring=false
 | `dev-box status` | コンテナ状態と公開ポートを表示 |
 | `dev-box logs [service]` | 全体または1サービスのログを追跡 |
 | `dev-box k8s` | Kubernetes マニフェストを生成 |
-| `dev-box deploy` | Terraform ファイルを生成 |
+| `dev-box deploy` | Terraform ファイルを生成（`--config` でスタックに合わせる） |
 | `dev-box version` | CLI とテンプレートスキーマのバージョンを表示 |
 
 ### `init` の主なオプション
@@ -271,6 +276,7 @@ dev-box init --config dev-box.yaml --backend python --monitoring=false
 --localstack
 --monitoring
 --cicd
+--cloud string   aws | gcp | azure | none
 --config string
 --force
 --dry-run
@@ -319,6 +325,11 @@ my-app/
 |   |-- prometheus.yml
 |   |-- promtail-config.yml
 |   `-- grafana/provisioning/
+|-- terraform/             # --cloud 指定時のみ
+|   |-- main.tf
+|   |-- variables.tf
+|   |-- terraform.tfvars.example
+|   `-- .gitignore
 `-- .github/workflows/ci.yml
 ```
 
@@ -408,6 +419,32 @@ terraform/
 - GCP OS Login と Shielded VM を使用
 - Azure は SSH 公開鍵を変数として受け取る
 
+### スタックとの連動
+
+`dev-box.yaml` の `cloud` を設定するか `init --cloud` を指定すると、同じ構成からプロジェクト配下の `terraform/` に生成します。既存の `dev-box.yaml` から後で生成する場合は `--config` を渡します。
+
+```bash
+dev-box init --frontend react --backend go --database postgres --cache redis --cloud aws --output-dir ./my-app
+dev-box deploy --config ./my-app/dev-box.yaml --output-dir ./my-app/terraform
+```
+
+`--provider` を指定した場合は、設定ファイルの `cloud` より優先されます。`--provider` も `cloud` の設定もない状態で、対話できない環境から実行するとエラーになります。
+
+- **インスタンスサイズ**: 選択したサービスの推定メモリから 4 段階の既定値を選びます。Java、MySQL、LocalStack、監視などは大きく見積もります。目安なので、`terraform.tfvars.example` のコメントにある変数で上書きできます。
+
+  | 推定メモリ | AWS | GCP | Azure |
+  |---|---|---|---|
+  | 〜700 MiB | t3.micro | e2-micro | Standard_B1s |
+  | 〜1,500 MiB | t3.small | e2-small | Standard_B1ms |
+  | 〜2,600 MiB | t3.medium | e2-medium | Standard_B2s |
+  | それ以上 | t3.large | e2-standard-2 | Standard_B2ms |
+
+- **タグ**: インスタンスに構成を表すタグが付きます（AWS は `Stack` タグ、GCP は `stack` ラベル、Azure は `stack` タグ）。例: `react-go-postgres-redis`。
+- **リソース名**: `name_prefix`（既定 `devbox`）から決まります。値を変えると、同じアカウントやネットワークに複数の環境を並べられます。GCP のネットワークタグも連動するため、環境間でファイアウォールが共有されません。
+- **`terraform/.gitignore`**: `.terraform/`、state、`terraform.tfvars` を除外します。
+
+AWS は送信通信を既定で閉じています。一方で、初回起動時の Docker 導入には外向きの HTTPS が必要です。NAT やプロキシのアドレス範囲を `allowed_egress_cidrs` で許可しないと、導入に失敗します（インスタンスの `/var/log/cloud-init-output.log` に記録されます）。
+
 利用時はサンプルをコピーし、環境に合わせて値を設定します。
 
 ```bash
@@ -483,6 +520,7 @@ dev-box start
 - Frontend の外部公開範囲や Ingress Controller 名前空間はクラスタ要件に合わせて調整してください。
 - LocalStack はサービスを起動しますが、S3 bucket などのリソース自体は作成しません。
 - AWS/GCP の外部アクセスには Public IP、NAT、踏み台、IAP などの追加設計が必要です。
+- Terraform のインスタンスサイズは推定値です。実際の負荷に合わせて変数で調整してください。
 - コンテナイメージはバージョンタグ固定であり、digest 固定ではありません。
 - Promtail は今後のサポート方針を確認し、必要に応じて Grafana Alloy などへの移行を検討してください。
 

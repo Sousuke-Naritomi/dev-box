@@ -15,33 +15,37 @@ provider "google" {
 
 resource "google_compute_firewall" "devbox" {
   count   = length(var.allowed_ssh_cidrs) > 0 ? 1 : 0
-  name    = "devbox-firewall"
+  name    = "${var.name_prefix}-firewall"
   network = "default"
   allow {
     protocol = "tcp"
     ports    = ["22"]
   }
   source_ranges = var.allowed_ssh_cidrs
-  target_tags   = ["devbox"]
+  target_tags   = [var.name_prefix]
 }
 
 resource "google_compute_firewall" "web" {
   count   = var.enable_public_web && length(var.allowed_web_cidrs) > 0 ? 1 : 0
-  name    = "devbox-web-firewall"
+  name    = "${var.name_prefix}-web-firewall"
   network = "default"
   allow {
     protocol = "tcp"
     ports    = ["80", "443"]
   }
   source_ranges = var.allowed_web_cidrs
-  target_tags   = ["devbox"]
+  target_tags   = [var.name_prefix]
 }
 
 resource "google_compute_instance" "devbox" {
-  name         = "devbox-instance"
-  machine_type = "e2-micro"
+  name         = "${var.name_prefix}-instance"
+  machine_type = var.machine_type
   zone         = var.zone
-  tags         = ["devbox"]
+  tags         = [var.name_prefix]
+
+  labels = {
+    stack = "{{ .Stack }}"
+  }
 
   metadata = {
     enable-oslogin = "TRUE"

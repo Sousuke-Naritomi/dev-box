@@ -21,6 +21,9 @@ func prepareGeneratedFiles(fileSystem fs.FileSystem, outputDir string, files map
 
 	for relativePath, file := range files {
 		target := generatedTargetPath(outputDir, relativePath)
+		if err := rejectSymlinkedParents(fileSystem, outputDir, relativePath); err != nil {
+			return nil, nil, err
+		}
 		isLink, err := fileSystem.IsSymlink(target)
 		if err != nil {
 			return nil, nil, fmt.Errorf("checking %s: %w", target, err)
@@ -33,7 +36,7 @@ func prepareGeneratedFiles(fileSystem fs.FileSystem, outputDir string, files map
 		}
 
 		content := file.Content
-		if relativePath == ".gitignore" && fileSystem.Exists(target) {
+		if filepath.Base(relativePath) == ".gitignore" && fileSystem.Exists(target) {
 			current, err := fileSystem.ReadFile(target)
 			if err != nil {
 				return nil, nil, fmt.Errorf("reading %s: %w", target, err)
@@ -45,6 +48,28 @@ func prepareGeneratedFiles(fileSystem fs.FileSystem, outputDir string, files map
 
 	sort.Strings(existing)
 	return prepared, existing, nil
+}
+
+// rejectSymlinkedParents refuses paths that traverse a symlinked directory below
+// outputDir, which would redirect writes outside the output tree. outputDir
+// itself is the caller's choice and may legitimately be a link.
+func rejectSymlinkedParents(fileSystem fs.FileSystem, outputDir, relativePath string) error {
+	dir := filepath.Dir(relativePath)
+	if dir == "." {
+		return nil
+	}
+	current := outputDir
+	for _, part := range strings.Split(filepath.ToSlash(dir), "/") {
+		current = filepath.Join(current, part)
+		isLink, err := fileSystem.IsSymlink(current)
+		if err != nil {
+			return fmt.Errorf("checking %s: %w", current, err)
+		}
+		if isLink {
+			return fmt.Errorf("refusing to write through symbolic link: %s", current)
+		}
+	}
+	return nil
 }
 
 func generatedTargetPath(outputDir, relativePath string) string {

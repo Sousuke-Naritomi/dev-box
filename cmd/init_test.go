@@ -16,7 +16,7 @@ import (
 // MockGenerator is a mock implementation of generator.Generator for testing.
 type MockGenerator struct {
 	ScaffoldFunc func(cfg config.ProjectConfig) (map[string]generator.FileDef, error)
-	TfFunc       func(provider string) (map[string]generator.FileDef, error)
+	TfFunc       func(provider string, cfg config.ProjectConfig) (map[string]generator.FileDef, error)
 	K8sFunc      func(cfg config.ProjectConfig) (map[string]generator.FileDef, error)
 }
 
@@ -27,9 +27,9 @@ func (m *MockGenerator) GenerateScaffold(cfg config.ProjectConfig) (map[string]g
 	return map[string]generator.FileDef{}, nil
 }
 
-func (m *MockGenerator) GenerateTerraform(provider string) (map[string]generator.FileDef, error) {
+func (m *MockGenerator) GenerateTerraform(provider string, cfg config.ProjectConfig) (map[string]generator.FileDef, error) {
 	if m.TfFunc != nil {
-		return m.TfFunc(provider)
+		return m.TfFunc(provider, cfg)
 	}
 	return map[string]generator.FileDef{}, nil
 }

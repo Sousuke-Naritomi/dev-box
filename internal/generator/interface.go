@@ -9,7 +9,7 @@ import (
 // mock generators for testing, or alternative implementations (e.g. Dry-run).
 type Generator interface {
 	GenerateScaffold(cfg config.ProjectConfig) (map[string]FileDef, error)
-	GenerateTerraform(provider string) (map[string]FileDef, error)
+	GenerateTerraform(provider string, cfg config.ProjectConfig) (map[string]FileDef, error)
 	GenerateK8sManifests(cfg config.ProjectConfig) (map[string]FileDef, error)
 }
 
@@ -22,8 +22,8 @@ func (g *DefaultGenerator) GenerateScaffold(cfg config.ProjectConfig) (map[strin
 }
 
 // GenerateTerraform implements Generator.
-func (g *DefaultGenerator) GenerateTerraform(provider string) (map[string]FileDef, error) {
-	return GenerateTerraform(provider)
+func (g *DefaultGenerator) GenerateTerraform(provider string, cfg config.ProjectConfig) (map[string]FileDef, error) {
+	return GenerateTerraform(provider, cfg)
 }
 
 // GenerateK8sManifests implements Generator.

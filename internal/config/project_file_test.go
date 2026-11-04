@@ -13,7 +13,7 @@ import (
 func TestProjectFileRoundTrip(t *testing.T) {
 	want := ProjectConfig{
 		Frontend: FrontendReact, Backend: BackendGo, Database: DatabasePostgres, Cache: CacheRedis,
-		Nginx: true, LocalStack: true, Monitoring: true, CICD: true, Force: true,
+		Nginx: true, LocalStack: true, Monitoring: true, CICD: true, Cloud: CloudNone, Force: true,
 	}
 	encoded, err := RenderProjectFile(want)
 	if err != nil {

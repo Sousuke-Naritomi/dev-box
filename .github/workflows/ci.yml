@@ -42,9 +42,12 @@ jobs:
         with:
           go-version-file: devbox-studio/backend/go.mod
           cache: false
-      - name: Test Studio API
+      - name: Vet Studio API
         working-directory: devbox-studio/backend
-        run: go test ./...
+        run: go vet ./...
+      - name: Test Studio API with race detector
+        working-directory: devbox-studio/backend
+        run: go test -race ./...
 
   studio-frontend:
     name: DevBox Studio frontend
@@ -216,5 +219,23 @@ jobs:
         with:
           scan-type: config
           scan-ref: ${{ runner.temp }}/terraform
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+      - name: Generate Terraform together with a sized project
+        run: go run . init --frontend=react --backend=go --database=postgres --cache=redis --monitoring --cloud=${{ matrix.provider }} --force --output-dir "$RUNNER_TEMP/project"
+      - name: Format check (project)
+        working-directory: ${{ runner.temp }}/project/terraform
+        run: terraform fmt -check -recursive
+      - name: Initialize (project)
+        working-directory: ${{ runner.temp }}/project/terraform
+        run: terraform init -backend=false
+      - name: Validate (project)
+        working-directory: ${{ runner.temp }}/project/terraform
+        run: terraform validate
+      - name: Security scan (project)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: config
+          scan-ref: ${{ runner.temp }}/project/terraform
           severity: CRITICAL,HIGH
           exit-code: "1"
