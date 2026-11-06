@@ -38,7 +38,7 @@
 - React/Vue の開発環境と本番ビルド用 Dockerfile の生成
 - Node.js/Python/Go/PHP/Java の API と Dockerfile の生成
 - MySQL/PostgreSQL、Redis、Nginx、LocalStack の追加
-- Prometheus、Grafana、Loki、Promtail の監視構成生成
+- Prometheus、Grafana、Loki、Grafana Alloy の監視構成生成
 - Kubernetes の Deployment、Service、PVC、NetworkPolicy 生成
 - AWS、GCP、Azure 向け Terraform 構成生成（選択したスタックに合わせたサイズとタグ付き）
 - GitHub Actions ワークフロー生成
@@ -76,7 +76,7 @@ Frontend と Backend には `none` を指定できます。
 | Cache | Redis 7 |
 | Reverse proxy | Nginx 1.30 |
 | AWS emulator | LocalStack 3.5（S3、SQS、SNS、DynamoDB） |
-| Monitoring | Prometheus、Grafana、Loki、Promtail |
+| Monitoring | Prometheus、Grafana、Loki、Grafana Alloy |
 | CI | GitHub Actions |
 
 使用するコンポーネントのバージョンは [`internal/config/versions.go`](internal/config/versions.go) で管理しています。
@@ -323,7 +323,7 @@ my-app/
 |   `-- nginx.conf
 |-- monitoring/
 |   |-- prometheus.yml
-|   |-- promtail-config.yml
+|   |-- config.alloy
 |   `-- grafana/provisioning/
 |-- terraform/             # --cloud 指定時のみ
 |   |-- main.tf
@@ -476,10 +476,10 @@ Terraform の対象は VM、基本ネットワーク、Docker のインストー
 `--monitoring` を指定すると次を追加します。
 
 - Prometheus による API `/metrics` の収集
-- Grafana の Prometheus datasource provisioning
-- Loki と Promtail によるログ収集設定
+- Grafana の Prometheus と Loki の datasource provisioning
+- Grafana Alloy によるログ収集設定（ホストの `/var/log/*.log` を Loki へ送ります）
 
-Promtail のホストログマウントは Linux を前提としています。Docker Desktop では取得できるログ範囲が異なります。
+Alloy は Docker ソケットをマウントせず、`/var/log` を読み取り専用でマウントします。ホストログのマウントは Linux を前提としているため、Docker Desktop では取得できるログ範囲が異なります。コンテナのログ収集は含みません。
 
 ## 安全性と信頼性
 
@@ -522,7 +522,7 @@ dev-box start
 - AWS/GCP の外部アクセスには Public IP、NAT、踏み台、IAP などの追加設計が必要です。
 - Terraform のインスタンスサイズは推定値です。実際の負荷に合わせて変数で調整してください。
 - コンテナイメージはバージョンタグ固定であり、digest 固定ではありません。
-- Promtail は今後のサポート方針を確認し、必要に応じて Grafana Alloy などへの移行を検討してください。
+- LocalStack は 3.5 に固定しています。GitHub 上の最新リリース（v4.14.0）が 2026 年 2 月のため、更新する場合は提供形態を確認してください。
 
 ## dev-box 自体の開発
 

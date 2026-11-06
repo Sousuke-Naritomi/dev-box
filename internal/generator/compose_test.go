@@ -112,7 +112,7 @@ func TestRenderCompose_FullStack(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	services := []string{"db:", "cache:", "frontend:", "api:", "nginx:", "localstack:", "prometheus:", "grafana:", "loki:", "promtail:"}
+	services := []string{"db:", "cache:", "frontend:", "api:", "nginx:", "localstack:", "prometheus:", "grafana:", "loki:", "alloy:"}
 	for _, svc := range services {
 		if !strings.Contains(result, svc) {
 			t.Errorf("expected compose to contain service %q", svc)
