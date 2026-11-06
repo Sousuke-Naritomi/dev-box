@@ -1,0 +1,40 @@
+name: govulncheck
+
+# Reports vulnerabilities in the standard library and in dependencies that the
+# code can actually reach. The toolchain is the latest patch release, because
+# the standard library is part of the result.
+on:
+  pull_request:
+    paths:
+      - "**/*.go"
+      - "go.mod"
+      - "go.sum"
+      - "devbox-studio/backend/go.mod"
+      - ".github/workflows/govulncheck.yml"
+  schedule:
+    - cron: "41 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  govulncheck:
+    name: govulncheck (${{ matrix.module }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        module: [".", "devbox-studio/backend"]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.26"
+          check-latest: true
+          cache: false
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.9.0
+      - name: Check for known vulnerabilities
+        working-directory: ${{ matrix.module }}
+        run: govulncheck ./...
