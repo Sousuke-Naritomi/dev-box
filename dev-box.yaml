@@ -7,3 +7,4 @@ nginx: false
 localstack: false
 monitoring: false
 cicd: false
+cloud: none
