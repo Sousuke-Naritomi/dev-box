@@ -72,9 +72,9 @@ Frontend と Backend には `none` を指定できます。
 
 | 種別 | 選択肢 |
 |---|---|
-| Database | MySQL 8.0、PostgreSQL 16 |
+| Database | MySQL 8.4、PostgreSQL 16 |
 | Cache | Redis 7 |
-| Reverse proxy | Nginx 1.27 |
+| Reverse proxy | Nginx 1.30 |
 | AWS emulator | LocalStack 3.5（S3、SQS、SNS、DynamoDB） |
 | Monitoring | Prometheus、Grafana、Loki、Promtail |
 | CI | GitHub Actions |
