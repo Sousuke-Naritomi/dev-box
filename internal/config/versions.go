@@ -11,10 +11,8 @@ const (
 	VersionPostgres = "16-alpine"
 	VersionRedis    = "7-alpine"
 	VersionNginx    = "1.30-alpine"
-	// Newer LocalStack images refuse to start without LOCALSTACK_AUTH_TOKEN (checked
-	// 2026-11-06), and the open source repository is archived. Confirm a candidate
-	// starts without credentials before bumping this.
-	VersionLocalStack = "3.5"
+	// Moto releases often and endoflife.date does not track it; bump it by hand.
+	VersionMoto       = "5.2.5"
 	VersionPrometheus = "v3.16.0"
 	VersionGrafana    = "13.3.0"
 	VersionLoki       = "3.7.9"

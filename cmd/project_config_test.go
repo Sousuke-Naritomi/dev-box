@@ -29,7 +29,7 @@ func TestExplicitFlagsOverrideProjectConfig(t *testing.T) {
 	cmd.Flags().String("database", "", "")
 	cmd.Flags().String("cache", "", "")
 	cmd.Flags().Bool("nginx", false, "")
-	cmd.Flags().Bool("localstack", false, "")
+	cmd.Flags().Bool("moto", false, "")
 	cmd.Flags().Bool("monitoring", false, "")
 	cmd.Flags().Bool("cicd", false, "")
 	if err := cmd.Flags().Parse([]string{"--backend=python", "--nginx=false"}); err != nil {

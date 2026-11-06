@@ -79,7 +79,7 @@ var stackSamples = map[string]config.ProjectConfig{
 	},
 	"everything": {
 		Frontend: config.FrontendVue, Backend: config.BackendJava, Database: config.DatabaseMySQL, Cache: config.CacheRedis,
-		Nginx: true, LocalStack: true, Monitoring: true, CICD: true,
+		Nginx: true, Moto: true, Monitoring: true, CICD: true,
 	},
 }
 

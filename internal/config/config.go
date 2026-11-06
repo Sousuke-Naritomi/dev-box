@@ -46,7 +46,7 @@ type ProjectConfig struct {
 	Database   DatabaseType  `yaml:"database"`
 	Cache      CacheType     `yaml:"cache"`
 	Nginx      bool          `yaml:"nginx"`
-	LocalStack bool          `yaml:"localstack"`
+	Moto       bool          `yaml:"moto"`
 	Monitoring bool          `yaml:"monitoring"`
 	CICD       bool          `yaml:"cicd"`
 	Cloud      CloudProvider `yaml:"cloud"`
@@ -59,7 +59,7 @@ func (c *ProjectConfig) Validate() error {
 		return err
 	}
 
-	if !c.HasWorkload() && !c.LocalStack && !c.Monitoring {
+	if !c.HasWorkload() && !c.Moto && !c.Monitoring {
 		return fmt.Errorf("at least one service must be selected")
 	}
 	if c.Nginx && c.Frontend == FrontendNone && c.Backend == BackendNone {

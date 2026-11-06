@@ -16,14 +16,14 @@ func TestValidateRejectsEmptyStack(t *testing.T) {
 
 func TestValidateAllowsOptionalServiceOnly(t *testing.T) {
 	cfg := ProjectConfig{
-		Frontend:   FrontendNone,
-		Backend:    BackendNone,
-		Database:   DatabaseNone,
-		Cache:      CacheNone,
-		LocalStack: true,
+		Frontend: FrontendNone,
+		Backend:  BackendNone,
+		Database: DatabaseNone,
+		Cache:    CacheNone,
+		Moto:     true,
 	}
 	if err := cfg.Validate(); err != nil {
-		t.Fatalf("expected LocalStack-only configuration to be valid: %v", err)
+		t.Fatalf("expected Moto-only configuration to be valid: %v", err)
 	}
 }
 

@@ -34,7 +34,7 @@ var trackedComponents = []pinnedComponent{
 // untrackedComponents are pinned versions that endoflife.date has no data for.
 // Each needs a reason, and a person to look at it when bumping.
 var untrackedComponents = map[string]string{
-	"VersionLocalStack": "the open source repository is archived and newer images need an auth token; see versions.go",
+	"VersionMoto":       "releases often and is not on endoflife.date; bump it by hand (see versions.go)",
 	"VersionPrometheus": "not on endoflife.date",
 	"VersionAlloy":      "not on endoflife.date",
 	"VersionTrivy":      "a CI tool, pinned together with trivy-action",

@@ -57,8 +57,8 @@ func estimatedMemoryMiB(cfg config.ProjectConfig) int {
 	if cfg.Nginx {
 		total += 20
 	}
-	if cfg.LocalStack {
-		total += 800
+	if cfg.Moto {
+		total += 100
 	}
 	if cfg.Monitoring {
 		total += 860
@@ -91,8 +91,8 @@ func stackLabel(cfg config.ProjectConfig) string {
 	if cfg.Nginx {
 		parts = append(parts, "nginx")
 	}
-	if cfg.LocalStack {
-		parts = append(parts, "localstack")
+	if cfg.Moto {
+		parts = append(parts, "moto")
 	}
 	if cfg.Monitoring {
 		parts = append(parts, "monitoring")

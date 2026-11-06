@@ -53,8 +53,8 @@ func applyAddonFlags(cmd *cobra.Command, cfg *config.ProjectConfig) {
 	if cmd.Flags().Changed("nginx") {
 		cfg.Nginx, _ = cmd.Flags().GetBool("nginx")
 	}
-	if cmd.Flags().Changed("localstack") {
-		cfg.LocalStack, _ = cmd.Flags().GetBool("localstack")
+	if cmd.Flags().Changed("moto") {
+		cfg.Moto, _ = cmd.Flags().GetBool("moto")
 	}
 	if cmd.Flags().Changed("monitoring") {
 		cfg.Monitoring, _ = cmd.Flags().GetBool("monitoring")

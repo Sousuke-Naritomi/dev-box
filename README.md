@@ -37,7 +37,7 @@
 - Docker または Podman による起動、停止、状態確認、ログ表示
 - React/Vue の開発環境と本番ビルド用 Dockerfile の生成
 - Node.js/Python/Go/PHP/Java の API と Dockerfile の生成
-- MySQL/PostgreSQL、Redis、Nginx、LocalStack の追加
+- MySQL/PostgreSQL、Redis、Nginx、Moto（AWS モック）の追加
 - Prometheus、Grafana、Loki、Grafana Alloy の監視構成生成
 - Kubernetes の Deployment、Service、PVC、NetworkPolicy 生成
 - AWS、GCP、Azure 向け Terraform 構成生成（選択したスタックに合わせたサイズとタグ付き）
@@ -75,7 +75,7 @@ Frontend と Backend には `none` を指定できます。
 | Database | MySQL 8.4、PostgreSQL 16 |
 | Cache | Redis 7 |
 | Reverse proxy | Nginx 1.30 |
-| AWS emulator | LocalStack 3.5（S3、SQS、SNS、DynamoDB） |
+| AWS mock | Moto 5.2.5（S3、SQS、SNS、DynamoDB など） |
 | Monitoring | Prometheus、Grafana、Loki、Grafana Alloy |
 | CI | GitHub Actions |
 
@@ -216,7 +216,7 @@ cache:    redis | none
 cloud:    aws | gcp | azure | none   （省略可。既定値は none）
 ```
 
-すべてが `none` で、LocalStack と Monitoring も無効な空構成は拒否されます。また、Nginx を使用する場合は Frontend または Backend が必要です。
+すべてが `none` で、Moto と Monitoring も無効な空構成は拒否されます。また、Nginx を使用する場合は Frontend または Backend が必要です。
 
 ## 設定ファイル
 
@@ -229,7 +229,7 @@ backend: go
 database: postgres
 cache: redis
 nginx: true
-localstack: false
+moto: false
 monitoring: true
 cicd: true
 cloud: aws
@@ -273,7 +273,7 @@ dev-box init --config dev-box.yaml --backend python --monitoring=false
 --database string
 --cache string
 --nginx
---localstack
+--moto
 --monitoring
 --cicd
 --cloud string   aws | gcp | azure | none
@@ -342,6 +342,7 @@ my-app/
 - 永続データに名前付きボリュームを使用
 - パスワードなどを `.env` から読み込み
 - Node.js の依存関係は `npm ci` でインストール
+- Moto を選択した場合は、非 root（`10001:10001`）で起動し、ヘルスチェックを付けます。`api` には AWS SDK 用の接続設定（`AWS_ENDPOINT_URL=http://moto:5000`、`AWS_DEFAULT_REGION`、ダミーの認証情報）を渡し、Moto が正常になってから `api` を起動します。ホストからは `docker compose port moto 5000` でポートを確認できます。
 
 生成される Dockerfile は、Compose の開発用起動とは別に、本番寄りのコンテナイメージを作成するためのものです。アプリケーションコンテナは原則として非 root ユーザーで動作します。Python のイメージは、Flask の開発サーバーではなく gunicorn で起動します（Compose の開発用起動は、再起動の速さのため `python main.py` のままです）。
 
@@ -430,7 +431,7 @@ dev-box deploy --config ./my-app/dev-box.yaml --output-dir ./my-app/terraform
 
 `--provider` を指定した場合は、設定ファイルの `cloud` より優先されます。`--provider` も `cloud` の設定もない状態で、対話できない環境から実行するとエラーになります。
 
-- **インスタンスサイズ**: 選択したサービスの推定メモリから 4 段階の既定値を選びます。Java、MySQL、LocalStack、監視などは大きく見積もります。目安なので、`terraform.tfvars.example` のコメントにある変数で上書きできます。
+- **インスタンスサイズ**: 選択したサービスの推定メモリから 4 段階の既定値を選びます。Java、MySQL、監視などは大きく見積もります。目安なので、`terraform.tfvars.example` のコメントにある変数で上書きできます。
 
   | 推定メモリ | AWS | GCP | Azure |
   |---|---|---|---|
@@ -518,11 +519,11 @@ dev-box start
 - Kubernetes の Database は StatefulSet ではなく Deployment + PVC です。本番ではマネージド DB や専用 Operator を検討してください。
 - Kubernetes の `db-secret` は自動生成されません。
 - Frontend の外部公開範囲や Ingress Controller 名前空間はクラスタ要件に合わせて調整してください。
-- LocalStack はサービスを起動しますが、S3 bucket などのリソース自体は作成しません。
+- Moto はサービスを起動しますが、S3 bucket などのリソース自体は作成しません。
 - AWS/GCP の外部アクセスには Public IP、NAT、踏み台、IAP などの追加設計が必要です。
 - Terraform のインスタンスサイズは推定値です。実際の負荷に合わせて変数で調整してください。
 - コンテナイメージはバージョンタグ固定であり、digest 固定ではありません。
-- LocalStack は 3.5 に固定しています。認証なしで動くコミュニティ版ですが、上流のリポジトリは 2026 年 3 月にアーカイブされ、更新されません。新しいイメージは `LOCALSTACK_AUTH_TOKEN` がないと起動しないため、既定では更新していません。
+- Moto はメモリ上で動作し、再起動するとデータは失われます。実際の AWS と同様に入力を検証するため（例: バケット名は 3〜63 文字）、他のエミュレーターで通っていた入力が拒否されることがあります。Moto は頻繁にリリースされ、サポート期限の自動チェック（endoflife.date）の対象外なので、`versions.go` の `VersionMoto` は手動で更新してください。
 
 ## dev-box 自体の開発
 

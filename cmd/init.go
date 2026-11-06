@@ -33,7 +33,7 @@ func init() {
 	initCmd.Flags().String("database", "", "Database (mysql, postgres, none)")
 	initCmd.Flags().String("cache", "", "Cache (redis, none)")
 	initCmd.Flags().Bool("nginx", false, "Include Nginx reverse proxy")
-	initCmd.Flags().Bool("localstack", false, "Include LocalStack")
+	initCmd.Flags().Bool("moto", false, "Include Moto (AWS mock server)")
 	initCmd.Flags().Bool("monitoring", false, "Include Monitoring (Prometheus + Grafana + Loki)")
 	initCmd.Flags().Bool("cicd", false, "Include CI/CD Pipeline")
 	initCmd.Flags().String("cloud", "", "Also generate Terraform for a cloud provider (aws, gcp, azure, none)")
@@ -103,8 +103,8 @@ func runInit(cmd *cobra.Command, args []string) error {
 		if configPath == "" && !cmd.Flags().Changed("nginx") {
 			fields = append(fields, huh.NewConfirm().Title("Include Nginx Reverse Proxy?").Value(&cfg.Nginx))
 		}
-		if configPath == "" && !cmd.Flags().Changed("localstack") {
-			fields = append(fields, huh.NewConfirm().Title("Include LocalStack? (AWS Local Emulator)").Value(&cfg.LocalStack))
+		if configPath == "" && !cmd.Flags().Changed("moto") {
+			fields = append(fields, huh.NewConfirm().Title("Include Moto? (AWS mock server: S3, SQS, SNS, DynamoDB)").Value(&cfg.Moto))
 		}
 		if configPath == "" && !cmd.Flags().Changed("monitoring") {
 			fields = append(fields, huh.NewConfirm().Title("Include Monitoring? (Prometheus + Grafana + Loki)").Value(&cfg.Monitoring))
@@ -152,7 +152,7 @@ type initOutputConfig struct {
 	Database   config.DatabaseType  `json:"database"`
 	Cache      config.CacheType     `json:"cache"`
 	Nginx      bool                 `json:"nginx"`
-	LocalStack bool                 `json:"localstack"`
+	Moto       bool                 `json:"moto"`
 	Monitoring bool                 `json:"monitoring"`
 	CICD       bool                 `json:"cicd"`
 	Cloud      config.CloudProvider `json:"cloud"`
@@ -180,11 +180,6 @@ func runInitLogic(ctx context.Context, cfg config.ProjectConfig, outputDir strin
 		}
 		if runtime.GOOS == "windows" && needsEnv {
 			if err := writeCommandOutput(output, "Note: verify the Windows ACL on .env; POSIX mode 0600 does not map directly to NTFS permissions.\n"); err != nil {
-				return err
-			}
-		}
-		if cfg.LocalStack {
-			if err := writeCommandOutput(output, "Note: LocalStack is pinned to %s, a community image that is no longer maintained upstream. Newer LocalStack images refuse to start without a LOCALSTACK_AUTH_TOKEN.\n", config.VersionLocalStack); err != nil {
 				return err
 			}
 		}
@@ -355,7 +350,7 @@ func writeInitJSONOutput(ctx context.Context, fileSystem fs.FileSystem, outputDi
 			Database:   cfg.Database,
 			Cache:      cfg.Cache,
 			Nginx:      cfg.Nginx,
-			LocalStack: cfg.LocalStack,
+			Moto:       cfg.Moto,
 			Monitoring: cfg.Monitoring,
 			CICD:       cfg.CICD,
 			Cloud:      normalizedCloud(cfg.Cloud),
