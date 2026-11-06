@@ -183,6 +183,11 @@ func runInitLogic(ctx context.Context, cfg config.ProjectConfig, outputDir strin
 				return err
 			}
 		}
+		if cfg.LocalStack {
+			if err := writeCommandOutput(output, "Note: LocalStack is pinned to %s, a community image that is no longer maintained upstream. Newer LocalStack images refuse to start without a LOCALSTACK_AUTH_TOKEN.\n", config.VersionLocalStack); err != nil {
+				return err
+			}
+		}
 	}
 
 	filesToWrite, needsEnv, err := buildInitFiles(cfg, gen)
