@@ -122,27 +122,39 @@ func TestGeneratedCIInstallsTrivyWithoutTheActionInstaller(t *testing.T) {
 }
 
 func TestRepositoryCIInstallsTheSameTrivyAsGeneratedProjects(t *testing.T) {
-	data, err := os.ReadFile(filepath.Join("..", "..", ".github", "workflows", "ci.yml"))
-	if err != nil {
-		t.Skipf("repository workflow not available: %v", err)
-	}
-	var wf workflowFile
-	if err := yaml.Unmarshal(data, &wf); err != nil {
-		t.Fatal(err)
+	workflows, err := filepath.Glob(filepath.Join("..", "..", ".github", "workflows", "*.yml"))
+	if err != nil || len(workflows) == 0 {
+		t.Skipf("repository workflows not available: %v", err)
 	}
 	found := 0
-	for name, job := range wf.Jobs {
-		for _, step := range job.Steps {
-			if step.Name == "Install Trivy" {
-				found++
-				if step.Env["TRIVY_VERSION"] != config.VersionTrivy {
-					t.Errorf("job %s installs Trivy %q but generated projects install %q; update both together", name, step.Env["TRIVY_VERSION"], config.VersionTrivy)
+	for _, path := range workflows {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var wf workflowFile
+		if err := yaml.Unmarshal(data, &wf); err != nil {
+			t.Fatalf("%s is not valid YAML: %v", path, err)
+		}
+		for name, job := range wf.Jobs {
+			installs, scans := 0, 0
+			for _, step := range job.Steps {
+				if step.Name == "Install Trivy" {
+					installs++
+					found++
+					if step.Env["TRIVY_VERSION"] != config.VersionTrivy {
+						t.Errorf("%s job %s installs Trivy %q but generated projects install %q; update all together", filepath.Base(path), name, step.Env["TRIVY_VERSION"], config.VersionTrivy)
+					}
+				}
+				if strings.HasPrefix(step.Uses, "aquasecurity/trivy-action@") {
+					scans++
+					if skip, _ := step.With["skip-setup-trivy"].(bool); !skip {
+						t.Errorf("%s job %s runs trivy-action without skip-setup-trivy", filepath.Base(path), name)
+					}
 				}
 			}
-			if strings.HasPrefix(step.Uses, "aquasecurity/trivy-action@") {
-				if skip, _ := step.With["skip-setup-trivy"].(bool); !skip {
-					t.Errorf("job %s runs trivy-action without skip-setup-trivy", name)
-				}
+			if scans > 0 && installs == 0 {
+				t.Errorf("%s job %s scans with Trivy but never installs it", filepath.Base(path), name)
 			}
 		}
 	}
