@@ -1,7 +1,7 @@
 services:
 
   frontend:
-    image: node:20-alpine
+    image: node:24-alpine
     restart: unless-stopped
     working_dir: /app
     volumes:
@@ -14,7 +14,7 @@ services:
       - dev-network
 
   api:
-    image: golang:1.22-alpine
+    image: golang:1.27-alpine
     working_dir: /app
     volumes:
       - ./backend:/app
@@ -29,7 +29,7 @@ services:
       - dev-network
 
   nginx:
-    image: nginx:1.27-alpine
+    image: nginx:1.30-alpine
     restart: unless-stopped
     ports:
       - "127.0.0.1:0:80"

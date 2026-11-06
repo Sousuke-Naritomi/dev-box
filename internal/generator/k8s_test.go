@@ -44,8 +44,8 @@ func TestGenerateK8sManifests_DBWithPVC(t *testing.T) {
 		image    string
 		pvcPath  string
 	}{
-		{"MySQL", "mysql", "mysql:8.0", "/var/lib/mysql"},
-		{"Postgres", "postgres", "postgres:16-alpine", "/var/lib/postgresql/data"},
+		{"MySQL", "mysql", "mysql:" + config.VersionMySQL, "/var/lib/mysql"},
+		{"Postgres", "postgres", "postgres:" + config.VersionPostgres, "/var/lib/postgresql/data"},
 	}
 
 	for _, tt := range tests {
