@@ -562,6 +562,32 @@ dev-box/
 
 テンプレートは `embed.FS` に組み込まれるため、リリース版は単一バイナリで動作します。
 
+### 自動チェック
+
+固定バージョンの陳腐化と脆弱性は、次のワークフローで検出します。
+
+| ワークフロー | 内容 | 実行タイミング |
+|---|---|---|
+| `CI` | テスト、lint、生成物（Compose、Kubernetes、Terraform、各言語のイメージ）の検証 | push、PR |
+| `Security scan` | 生成した 5 つのプロジェクトを、生成 CI と同じ Trivy の設定でスキャン。Python は `pip-audit` も実行 | PR（テンプレートと依存関係）、毎週 |
+| `govulncheck` | Go の標準ライブラリと依存関係のうち、到達可能な脆弱性 | PR（Go コード）、毎週 |
+| `End-of-life check` | 固定バージョンが [endoflife.date](https://endoflife.date) でサポート終了していないか（45 日前から失敗） | PR（`versions.go`）、毎週 |
+
+CI の Go は、`go.mod` のマイナーバージョンの最新パッチを使います。`go 1.26.0` を完全一致で解釈すると、修正前の標準ライブラリになるためです。
+
+### バージョンを更新する手順
+
+1. `internal/config/versions.go` を更新します。新しい固定バージョンを足す場合は、`internal/config/eol_test.go` で、サポート状況の追跡対象にするか、理由つきで除外するかを決めます。
+2. リポジトリ直下のサンプルを再生成します。差分のあるファイルだけを反映し、`.env` と `.gitignore` は上書きしません。`TestRootSampleMatchesGeneratorOutput` が、反映漏れを検出します。
+
+   ```bash
+   dev-box init --config dev-box.yaml --force --output-dir <一時ディレクトリ>
+   dev-box k8s --config dev-box.yaml --force --output-dir k8s-manifests
+   ```
+
+3. スタックを実際に起動して確認します。`docker compose up` での起動と応答、生成された `Dockerfile` のビルドと起動、監視を含める場合は Prometheus のターゲットと Grafana のデータソースまで確認します。
+4. 生成プロジェクトを Trivy でスキャンし、固定している依存関係に脆弱性がないことを確認します。
+
 ## ライセンス
 
 [MIT License](LICENSE)
