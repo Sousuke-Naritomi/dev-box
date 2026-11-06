@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 )
 
 func main() {
@@ -31,8 +32,13 @@ func main() {
 			http.Error(w, "failed to encode metrics", http.StatusInternalServerError)
 		}
 	})
+	// A server without ReadHeaderTimeout lets a slow client hold a connection open indefinitely.
+	server := &http.Server{
+		Addr:              fmt.Sprintf(":%s", port),
+		ReadHeaderTimeout: 10 * time.Second,
+	}
 	log.Printf("Server starting on :%s", port)
-	if err := http.ListenAndServe(fmt.Sprintf(":%s", port), nil); err != nil {
+	if err := server.ListenAndServe(); err != nil {
 		log.Fatalf("Server failed: %v", err)
 	}
 }
