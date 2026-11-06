@@ -8,4 +8,4 @@ COPY --chown=app:app . .
 USER 10001:10001
 ENV BACKEND_PORT=8080
 EXPOSE 8080
-CMD ["python", "main.py"]
+CMD ["sh", "-c", "exec gunicorn --bind 0.0.0.0:${BACKEND_PORT} --workers 2 --access-logfile - main:app"]
