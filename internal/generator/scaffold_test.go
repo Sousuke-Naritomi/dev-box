@@ -84,3 +84,39 @@ func TestGoScaffoldServerSetsAHeaderTimeout(t *testing.T) {
 		t.Error("use an explicit http.Server instead of the package-level ListenAndServe, which has no timeouts")
 	}
 }
+
+// The Flask development server is not meant to serve traffic, so the production
+// image runs the app under gunicorn. The development Compose service keeps
+// `python main.py` for fast restarts.
+func TestPythonImageRunsGunicornNotTheDevelopmentServer(t *testing.T) {
+	dockerfile := scaffoldFile(t, config.BackendPython, "backend/Dockerfile")
+
+	var cmd string
+	for _, line := range strings.Split(dockerfile, "\n") {
+		if strings.HasPrefix(line, "CMD ") {
+			cmd = line
+		}
+	}
+	if cmd == "" {
+		t.Fatalf("no CMD in:\n%s", dockerfile)
+	}
+	if strings.Contains(cmd, "main.py") {
+		t.Errorf("the image must not start the Flask development server: %s", cmd)
+	}
+	for _, want := range []string{"gunicorn", "exec ", "0.0.0.0:${BACKEND_PORT}", "main:app"} {
+		if !strings.Contains(cmd, want) {
+			t.Errorf("CMD should contain %q (exec makes gunicorn PID 1 so it receives stop signals; BACKEND_PORT keeps the port configurable): %s", want, cmd)
+		}
+	}
+	if !strings.Contains(dockerfile, "USER 10001:10001") {
+		t.Error("the image must keep running as a non-root user")
+	}
+
+	files, err := GenerateScaffold(config.ProjectConfig{Frontend: config.FrontendNone, Backend: config.BackendPython})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(files["backend/requirements.txt"].Content, "gunicorn") {
+		t.Error("gunicorn must be installed in the image")
+	}
+}
