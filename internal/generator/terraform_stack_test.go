@@ -72,7 +72,7 @@ func TestSizeNeverShrinksWhenServicesAreAdded(t *testing.T) {
 	baseTier := memoryTier(estimatedMemoryMiB(base))
 	for name, add := range map[string]func(*config.ProjectConfig){
 		"nginx":      func(c *config.ProjectConfig) { c.Nginx = true },
-		"localstack": func(c *config.ProjectConfig) { c.LocalStack = true },
+		"moto":       func(c *config.ProjectConfig) { c.Moto = true },
 		"monitoring": func(c *config.ProjectConfig) { c.Monitoring = true },
 		"mysql":      func(c *config.ProjectConfig) { c.Database = config.DatabaseMySQL },
 		"java":       func(c *config.ProjectConfig) { c.Backend = config.BackendJava },
@@ -101,7 +101,7 @@ func TestStackLabelIsValidForEveryCloud(t *testing.T) {
 					for addons := 0; addons < 8; addons++ {
 						cfg := config.ProjectConfig{
 							Frontend: f, Backend: b, Database: d, Cache: c,
-							Nginx: addons&1 != 0, LocalStack: addons&2 != 0, Monitoring: addons&4 != 0,
+							Nginx: addons&1 != 0, Moto: addons&2 != 0, Monitoring: addons&4 != 0,
 						}
 						if label := stackLabel(cfg); !valid.MatchString(label) {
 							t.Fatalf("stackLabel(%+v) = %q is not a valid cloud label", cfg, label)

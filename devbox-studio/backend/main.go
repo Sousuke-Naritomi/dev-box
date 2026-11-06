@@ -28,7 +28,7 @@ type stackConfig struct {
 	Database   string `json:"database"`
 	Cache      string `json:"cache"`
 	Nginx      bool   `json:"nginx"`
-	LocalStack bool   `json:"localstack"`
+	Moto       bool   `json:"moto"`
 	Monitoring bool   `json:"monitoring"`
 	CICD       bool   `json:"cicd"`
 	Cloud      string `json:"cloud"`
@@ -132,7 +132,7 @@ func handleOptions(w http.ResponseWriter, r *http.Request) {
 		"databases": []string{"postgres", "mysql", "none"},
 		"caches":    []string{"redis", "none"},
 		"clouds":    []string{"none", "aws", "gcp", "azure"},
-		"addons":    []string{"nginx", "localstack", "monitoring", "cicd"},
+		"addons":    []string{"nginx", "moto", "monitoring", "cicd"},
 	})
 }
 
@@ -251,7 +251,7 @@ func readConfig(w http.ResponseWriter, r *http.Request) (stackConfig, error) {
 	if !allowedClouds[cfg.Cloud] {
 		return cfg, fmt.Errorf("未対応のクラウドです: %s", cfg.Cloud)
 	}
-	if cfg.Frontend == "none" && cfg.Backend == "none" && cfg.Database == "none" && cfg.Cache == "none" && !cfg.LocalStack && !cfg.Monitoring {
+	if cfg.Frontend == "none" && cfg.Backend == "none" && cfg.Database == "none" && cfg.Cache == "none" && !cfg.Moto && !cfg.Monitoring {
 		return cfg, fmt.Errorf("少なくとも1つのワークロードまたは追加機能を選択してください")
 	}
 	if cfg.Nginx && cfg.Frontend == "none" && cfg.Backend == "none" {
@@ -318,8 +318,8 @@ func devBoxArgs(cfg stackConfig, dryRun bool, outputDir string) []string {
 	if cfg.Nginx {
 		args = append(args, "--nginx")
 	}
-	if cfg.LocalStack {
-		args = append(args, "--localstack")
+	if cfg.Moto {
+		args = append(args, "--moto")
 	}
 	if cfg.Monitoring {
 		args = append(args, "--monitoring")
@@ -461,8 +461,8 @@ func summarize(cfg stackConfig, fileCount int) string {
 	if cfg.Nginx {
 		addons = append(addons, "Nginx")
 	}
-	if cfg.LocalStack {
-		addons = append(addons, "LocalStack")
+	if cfg.Moto {
+		addons = append(addons, "Moto")
 	}
 	if cfg.Monitoring {
 		addons = append(addons, "監視")

@@ -70,13 +70,26 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:0:{{ .Backend.InternalPort }}"
-    {{- if and (ne .Config.Database "none") (ne .Config.Database "") }}
+    {{- if or (and (ne .Config.Database "none") (ne .Config.Database "")) .Config.Moto }}
     depends_on:
+      {{- if and (ne .Config.Database "none") (ne .Config.Database "") }}
       db:
         condition: service_healthy
+      {{- end }}
+      {{- if .Config.Moto }}
+      moto:
+        condition: service_healthy
+      {{- end }}
     {{- end }}
     env_file:
       - .env
+    {{- if .Config.Moto }}
+    environment:
+      - AWS_ENDPOINT_URL=http://moto:5000
+      - AWS_DEFAULT_REGION=ap-northeast-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+    {{- end }}
     networks:
       - dev-network
 {{- end }}
@@ -101,18 +114,20 @@ services:
       - dev-network
 {{- end }}
 
-{{- if .Config.LocalStack }}
+{{- if .Config.Moto }}
 
-  localstack:
-    image: localstack/localstack:{{ .VersionLocalStack }}
+  moto:
+    image: motoserver/moto:{{ .VersionMoto }}
     restart: unless-stopped
+    user: "10001:10001"
     ports:
-      - "127.0.0.1:0:4566"
-    environment:
-      - SERVICES=s3,sqs,sns,dynamodb
-      - DEFAULT_REGION=ap-northeast-1
-    volumes:
-      - localstack-data:/var/lib/localstack
+      - "127.0.0.1:0:5000"
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:5000/moto-api/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     networks:
       - dev-network
 {{- end }}
@@ -184,9 +199,6 @@ volumes:
 {{- end }}
 {{- if eq .Config.Backend "go" }}
   go-mod-cache:
-{{- end }}
-{{- if .Config.LocalStack }}
-  localstack-data:
 {{- end }}
 {{- if .Config.Monitoring }}
   prometheus-data:

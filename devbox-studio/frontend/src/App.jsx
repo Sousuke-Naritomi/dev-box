@@ -15,7 +15,7 @@ const defaultConfig = {
   database: 'postgres',
   cache: 'redis',
   nginx: true,
-  localstack: false,
+  moto: false,
   monitoring: true,
   cicd: true,
   cloud: 'none',
@@ -138,7 +138,7 @@ function App() {
           </div>
 
           <div className="addons" aria-label="追加機能">
-            {['nginx', 'localstack', 'monitoring', 'cicd'].map((field) => (
+            {['nginx', 'moto', 'monitoring', 'cicd'].map((field) => (
               <label className="toggle" key={field}>
                 <input
                   type="checkbox"
@@ -260,7 +260,7 @@ function display(value) {
 function addonLabel(value) {
   return {
     nginx: 'Nginx リバースプロキシ',
-    localstack: 'LocalStack',
+    moto: 'Moto (AWS モック: S3 / SQS / SNS / DynamoDB)',
     monitoring: 'Prometheus / Grafana 監視',
     cicd: 'GitHub Actions',
   }[value];

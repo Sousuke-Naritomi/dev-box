@@ -47,7 +47,7 @@ func TestHasCloud(t *testing.T) {
 }
 
 func TestProjectFileWithoutCloudStillParses(t *testing.T) {
-	cfg, err := ParseProjectFile([]byte("version: 1\nfrontend: react\nbackend: go\ndatabase: postgres\ncache: redis\nnginx: false\nlocalstack: false\nmonitoring: false\ncicd: false\n"))
+	cfg, err := ParseProjectFile([]byte("version: 1\nfrontend: react\nbackend: go\ndatabase: postgres\ncache: redis\nnginx: false\nmoto: false\nmonitoring: false\ncicd: false\n"))
 	if err != nil {
 		t.Fatalf("project files written before the cloud option must keep working: %v", err)
 	}
@@ -102,5 +102,14 @@ func TestProjectFileRoundTripPreservesCloud(t *testing.T) {
 		if parsed != cfg {
 			t.Errorf("round trip changed the config: got %+v, want %+v", parsed, cfg)
 		}
+	}
+}
+
+// LocalStack was replaced by Moto without a compatibility path: the project file
+// is parsed strictly, so an old file fails with the name of the unknown key.
+func TestOldLocalStackKeyIsRejectedByName(t *testing.T) {
+	_, err := ParseProjectFile([]byte("version: 1\nfrontend: none\nbackend: go\ndatabase: none\ncache: none\nlocalstack: true\n"))
+	if err == nil || !strings.Contains(err.Error(), "localstack") {
+		t.Fatalf("expected an error that names the localstack key, got %v", err)
 	}
 }

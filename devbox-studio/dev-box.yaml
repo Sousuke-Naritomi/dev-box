@@ -4,6 +4,6 @@ backend: go
 database: none
 cache: none
 nginx: true
-localstack: false
+moto: false
 monitoring: false
 cicd: true

@@ -102,7 +102,7 @@ func TestRenderCompose_Postgres(t *testing.T) {
 func TestRenderCompose_FullStack(t *testing.T) {
 	cfg := config.ProjectConfig{
 		Frontend: "react", Backend: "node", Database: "mysql", Cache: "redis",
-		Nginx: true, LocalStack: true, Monitoring: true,
+		Nginx: true, Moto: true, Monitoring: true,
 	}
 	data, _ := ResolveComposeData(cfg)
 	data.DBPassword = "test"
@@ -112,7 +112,7 @@ func TestRenderCompose_FullStack(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	services := []string{"db:", "cache:", "frontend:", "api:", "nginx:", "localstack:", "prometheus:", "grafana:", "loki:", "alloy:"}
+	services := []string{"db:", "cache:", "frontend:", "api:", "nginx:", "moto:", "prometheus:", "grafana:", "loki:", "alloy:"}
 	for _, svc := range services {
 		if !strings.Contains(result, svc) {
 			t.Errorf("expected compose to contain service %q", svc)
@@ -184,7 +184,6 @@ func TestResolveComposeDataDetectsNamedVolumes(t *testing.T) {
 		{Frontend: config.FrontendReact, Backend: config.BackendNone, Database: config.DatabaseNone, Cache: config.CacheNone},
 		{Frontend: config.FrontendNone, Backend: config.BackendNode, Database: config.DatabaseNone, Cache: config.CacheNone},
 		{Frontend: config.FrontendNone, Backend: config.BackendGo, Database: config.DatabaseNone, Cache: config.CacheNone},
-		{Frontend: config.FrontendNone, Backend: config.BackendNone, Database: config.DatabaseNone, Cache: config.CacheNone, LocalStack: true},
 		{Frontend: config.FrontendNone, Backend: config.BackendNone, Database: config.DatabaseNone, Cache: config.CacheNone, Monitoring: true},
 	}
 	for _, cfg := range tests {
@@ -195,6 +194,17 @@ func TestResolveComposeDataDetectsNamedVolumes(t *testing.T) {
 		if !data.HasVolumes {
 			t.Fatalf("expected named volumes for config %#v", cfg)
 		}
+	}
+}
+
+// Moto keeps its state in memory, so a project with only Moto declares no volumes.
+func TestResolveComposeDataMotoNeedsNoVolumes(t *testing.T) {
+	data, err := ResolveComposeData(config.ProjectConfig{Frontend: config.FrontendNone, Backend: config.BackendNone, Database: config.DatabaseNone, Cache: config.CacheNone, Moto: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if data.HasVolumes {
+		t.Error("Moto alone must not declare named volumes")
 	}
 }
 

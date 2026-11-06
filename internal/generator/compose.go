@@ -34,7 +34,7 @@ type ComposeData struct {
 	VersionPostgres   string
 	VersionRedis      string
 	VersionNginx      string
-	VersionLocalStack string
+	VersionMoto       string
 	VersionPrometheus string
 	VersionGrafana    string
 	VersionLoki       string
@@ -49,7 +49,6 @@ func ResolveComposeData(cfg config.ProjectConfig) (*ComposeData, error) {
 			cfg.Frontend != config.FrontendNone ||
 			cfg.Backend == config.BackendNode ||
 			cfg.Backend == config.BackendGo ||
-			cfg.LocalStack ||
 			cfg.Monitoring,
 		VersionNode:       config.VersionNode,
 		VersionPython:     config.VersionPython,
@@ -60,7 +59,7 @@ func ResolveComposeData(cfg config.ProjectConfig) (*ComposeData, error) {
 		VersionPostgres:   config.VersionPostgres,
 		VersionRedis:      config.VersionRedis,
 		VersionNginx:      config.VersionNginx,
-		VersionLocalStack: config.VersionLocalStack,
+		VersionMoto:       config.VersionMoto,
 		VersionPrometheus: config.VersionPrometheus,
 		VersionGrafana:    config.VersionGrafana,
 		VersionLoki:       config.VersionLoki,

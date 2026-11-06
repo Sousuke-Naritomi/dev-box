@@ -4,7 +4,7 @@ backend: go
 database: postgres
 cache: redis
 nginx: false
-localstack: false
+moto: false
 monitoring: false
 cicd: false
 cloud: none

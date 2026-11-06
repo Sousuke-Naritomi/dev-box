@@ -497,3 +497,35 @@ func TestOptionsListTheClouds(t *testing.T) {
 		t.Errorf("clouds = %v", got["clouds"])
 	}
 }
+
+func TestMotoIsOfferedAndForwarded(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/api/options", nil)
+	req.Host = "127.0.0.1:8080"
+	rec := httptest.NewRecorder()
+	newHandler().ServeHTTP(rec, req)
+	var opts map[string][]string
+	if err := json.Unmarshal(rec.Body.Bytes(), &opts); err != nil {
+		t.Fatal(err)
+	}
+	if !contains(opts["addons"], "moto") || contains(opts["addons"], "localstack") {
+		t.Errorf("addons = %v, want moto and not localstack", opts["addons"])
+	}
+
+	args := devBoxArgs(stackConfig{Frontend: "none", Backend: "go", Moto: true}, false, "out")
+	if !contains(args, "--moto") || contains(args, "--localstack") {
+		t.Errorf("args = %v", args)
+	}
+	if !strings.Contains(summarize(stackConfig{Frontend: "none", Backend: "go", Moto: true}, 5), "Moto") {
+		t.Error("the preview summary should mention Moto")
+	}
+}
+
+func TestMotoAloneIsAValidSelection(t *testing.T) {
+	stubRunner(t, func([]string, string) (string, error) {
+		return `{"files":[{"path":"studio-preview/docker-compose.yml","content":"services: {}\n"}]}`, nil
+	})
+	rec := postJSON(newHandler(), "/api/preview", `{"frontend":"none","backend":"none","database":"none","cache":"none","moto":true}`, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Moto alone is a workload; status = %d, body: %s", rec.Code, rec.Body.String())
+	}
+}
