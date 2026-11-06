@@ -72,3 +72,15 @@ func TestDerivedVersionHelpers(t *testing.T) {
 		}
 	}
 }
+
+// A server without ReadHeaderTimeout lets a slow client hold a connection open
+// indefinitely (gosec G114); the sample should not teach that pattern.
+func TestGoScaffoldServerSetsAHeaderTimeout(t *testing.T) {
+	source := scaffoldFile(t, config.BackendGo, "backend/main.go")
+	if !strings.Contains(source, "ReadHeaderTimeout") {
+		t.Errorf("the Go sample must configure http.Server.ReadHeaderTimeout:\n%s", source)
+	}
+	if strings.Contains(source, "http.ListenAndServe(") {
+		t.Error("use an explicit http.Server instead of the package-level ListenAndServe, which has no timeouts")
+	}
+}
