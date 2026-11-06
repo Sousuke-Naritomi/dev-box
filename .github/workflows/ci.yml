@@ -17,7 +17,8 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          go-version: "1.26"
+          check-latest: true
           cache: true
       - name: Verify formatting
         run: test -z "$(gofmt -l .)"
@@ -40,7 +41,8 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
         with:
-          go-version-file: devbox-studio/backend/go.mod
+          go-version: "1.26"
+          check-latest: true
           cache: false
       - name: Vet Studio API
         working-directory: devbox-studio/backend
@@ -80,7 +82,8 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          go-version: "1.26"
+          check-latest: true
       - name: Generate stack
         run: go run . init ${{ matrix.stack }} --force --output-dir "$RUNNER_TEMP/generated"
       - name: Validate Compose
@@ -94,7 +97,8 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          go-version: "1.26"
+          check-latest: true
       - name: Generate initial project
         run: go run . init --frontend=react --backend=node --database=postgres --cache=redis --nginx --monitoring --cicd --force --output-dir "$RUNNER_TEMP/initial"
       - name: Replay from dev-box.yaml
@@ -112,7 +116,8 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          go-version: "1.26"
+          check-latest: true
       - name: Generate project configuration
         run: go run . init --frontend=react --backend=go --database=postgres --cache=redis --force --output-dir "$RUNNER_TEMP/generated"
       - name: Generate manifests from project configuration
@@ -127,7 +132,8 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          go-version: "1.26"
+          check-latest: true
       - name: Generate frontend image
         run: go run . init --frontend=react --backend=none --database=none --cache=none --force --output-dir "$RUNNER_TEMP/generated"
       - name: Build and verify image user
@@ -169,7 +175,8 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          go-version: "1.26"
+          check-latest: true
       - name: Generate backend image
         run: go run . init --frontend=none --backend=${{ matrix.backend }} --database=none --cache=none --force --output-dir "$RUNNER_TEMP/generated"
       - name: Build and verify image user
@@ -201,7 +208,8 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          go-version: "1.26"
+          check-latest: true
       - uses: hashicorp/setup-terraform@v3
       # trivy-action's installer downloads through get.trivy.dev, which stopped
       # resolving on 2026-11-03. Install the same Trivy release straight from
