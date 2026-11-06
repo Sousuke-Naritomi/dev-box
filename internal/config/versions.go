@@ -12,10 +12,10 @@ const (
 	VersionRedis      = "7-alpine"
 	VersionNginx      = "1.30-alpine"
 	VersionLocalStack = "3.5"
-	VersionPrometheus = "v2.53.0"
-	VersionGrafana    = "11.1.0"
-	VersionLoki       = "3.1.0"
-	VersionPromtail   = "3.1.0"
+	VersionPrometheus = "v3.16.0"
+	VersionGrafana    = "13.3.0"
+	VersionLoki       = "3.7.9"
+	VersionAlloy      = "v1.21.3"
 
 	// VersionTrivy is installed by the generated CI and by this repository's own
 	// CI. It matches the default of aquasecurity/trivy-action@v0.36.0.

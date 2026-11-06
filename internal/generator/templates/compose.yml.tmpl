@@ -158,12 +158,13 @@ services:
     networks:
       - dev-network
 
-  promtail:
-    image: grafana/promtail:{{ .VersionPromtail }}
+  alloy:
+    image: grafana/alloy:{{ .VersionAlloy }}
     restart: unless-stopped
     volumes:
       - /var/log:/var/log:ro
-      - ./monitoring/promtail-config.yml:/etc/promtail/config.yml:ro
+      - ./monitoring/config.alloy:/etc/alloy/config.alloy:ro
+      - alloy-data:/var/lib/alloy/data
     depends_on:
       - loki
     networks:
@@ -191,6 +192,7 @@ volumes:
   prometheus-data:
   grafana-data:
   loki-data:
+  alloy-data:
 {{- end }}
 {{- end }}
 

@@ -286,11 +286,11 @@ func buildInitFiles(cfg config.ProjectConfig, gen generator.Generator) (map[stri
 		}
 		filesToWrite[filepath.Join("monitoring", "grafana", "provisioning", "datasources", "prometheus.yml")] = generator.FileDef{Content: datasource, Perm: 0644}
 
-		promtail, err := generator.RenderPromtailConfig()
+		alloy, err := generator.RenderAlloyConfig()
 		if err != nil {
-			return nil, false, fmt.Errorf("rendering Promtail config: %w", err)
+			return nil, false, fmt.Errorf("rendering Alloy config: %w", err)
 		}
-		filesToWrite[filepath.Join("monitoring", "promtail-config.yml")] = generator.FileDef{Content: promtail, Perm: 0644}
+		filesToWrite[filepath.Join("monitoring", "config.alloy")] = generator.FileDef{Content: alloy, Perm: 0644}
 	}
 
 	if cfg.CICD {

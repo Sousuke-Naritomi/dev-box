@@ -38,7 +38,7 @@ type ComposeData struct {
 	VersionPrometheus string
 	VersionGrafana    string
 	VersionLoki       string
-	VersionPromtail   string
+	VersionAlloy      string
 }
 
 // ResolveComposeData resolves ports and generates passwords based on the project config.
@@ -64,7 +64,7 @@ func ResolveComposeData(cfg config.ProjectConfig) (*ComposeData, error) {
 		VersionPrometheus: config.VersionPrometheus,
 		VersionGrafana:    config.VersionGrafana,
 		VersionLoki:       config.VersionLoki,
-		VersionPromtail:   config.VersionPromtail,
+		VersionAlloy:      config.VersionAlloy,
 	}
 
 	if f, ok := registry.SupportedFrontends[cfg.Frontend]; ok {
@@ -168,8 +168,8 @@ func RenderGrafanaDatasource() (string, error) {
 	return string(b), err
 }
 
-// RenderPromtailConfig returns the promtail-config.yml configuration content.
-func RenderPromtailConfig() (string, error) {
-	b, err := FS.ReadFile("templates/promtail-config.yml.tmpl")
+// RenderAlloyConfig returns the Grafana Alloy configuration that ships host logs to Loki.
+func RenderAlloyConfig() (string, error) {
+	b, err := FS.ReadFile("templates/alloy-config.alloy.tmpl")
 	return string(b), err
 }
