@@ -27,7 +27,7 @@ jobs:
       matrix:
         include:
           - name: react-node
-            flags: "--frontend=react --backend=node --database=mysql --cache=redis --nginx --monitoring --cicd"
+            flags: "--frontend=react --backend=node --database=mysql --cache=redis --nginx --moto --monitoring --cicd"
           - name: vue-python
             flags: "--frontend=vue --backend=python --database=postgres --cache=none"
           - name: php

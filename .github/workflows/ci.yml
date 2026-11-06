@@ -78,6 +78,8 @@ jobs:
           - "--frontend=react --backend=go --database=postgres --cache=redis --nginx --monitoring"
           - "--frontend=none --backend=node --database=mysql --cache=none"
           - "--frontend=vue --backend=none --database=none --cache=none"
+          - "--frontend=none --backend=go --database=postgres --cache=none --moto"
+          - "--frontend=none --backend=none --database=none --cache=none --moto"
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
@@ -89,6 +91,36 @@ jobs:
       - name: Validate Compose
         working-directory: ${{ runner.temp }}/generated
         run: docker compose config --quiet
+
+  generated-moto:
+    name: Start generated Moto stack
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.26"
+          check-latest: true
+      - name: Generate stack
+        run: go run . init --frontend=none --backend=go --database=postgres --cache=none --moto --force --output-dir "$RUNNER_TEMP/generated"
+      - name: Start and wait until every service is healthy
+        working-directory: ${{ runner.temp }}/generated
+        run: docker compose up -d --wait --wait-timeout 180
+      - name: Verify the AWS mock answers and the api is wired to it
+        working-directory: ${{ runner.temp }}/generated
+        run: |
+          MOTO_PORT=$(docker compose port moto 5000 | awk -F: '{print $NF}')
+          curl -fsS "http://127.0.0.1:${MOTO_PORT}/moto-api/" >/dev/null
+          curl -fsS -X PUT "http://127.0.0.1:${MOTO_PORT}/devbox-bucket" >/dev/null
+          docker compose exec -T api printenv AWS_ENDPOINT_URL | grep -x "http://moto:5000"
+      - name: Show logs on failure
+        if: failure()
+        working-directory: ${{ runner.temp }}/generated
+        run: docker compose logs
+      - name: Tear down
+        if: always()
+        working-directory: ${{ runner.temp }}/generated
+        run: docker compose down -v
 
   declarative-config:
     name: Replay declarative project configuration
