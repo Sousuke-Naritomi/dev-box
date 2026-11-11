@@ -1,0 +1,86 @@
+name: Release
+
+# Pushing a tag that starts with "v" publishes a GitHub release. Pull requests
+# that touch the release configuration, and manual runs, build a snapshot and
+# publish nothing, so the pipeline is exercised before the first tag.
+on:
+  push:
+    tags:
+      - "v*"
+  pull_request:
+    paths:
+      - ".goreleaser.yaml"
+      - ".github/workflows/release.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  snapshot:
+    name: Snapshot build
+    if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.26"
+          check-latest: true
+          cache: false
+      - uses: anchore/sbom-action/download-syft@v0.24.3
+      - name: Build every target without publishing
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --snapshot --clean
+      - name: Verify the checksums match the archives
+        working-directory: dist
+        run: sha256sum -c checksums.txt
+      - name: Run the Linux binary
+        run: dist/dev-box_linux_amd64_v1/dev-box version
+      - uses: actions/upload-artifact@v7
+        with:
+          name: snapshot
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/*.sbom.json
+            dist/checksums.txt
+          retention-days: 7
+
+  release:
+    name: Release
+    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.26"
+          check-latest: true
+          cache: false
+      - uses: anchore/sbom-action/download-syft@v0.24.3
+      - name: Build and publish the release
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Lets anyone check that an archive was built by this workflow from this
+      # repository: gh attestation verify <file> --repo Sousuke-Naritomi/dev-box
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-checksums: dist/checksums.txt

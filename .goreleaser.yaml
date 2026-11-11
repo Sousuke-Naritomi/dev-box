@@ -1,3 +1,5 @@
+version: 2
+
 project_name: dev-box
 
 before:
@@ -7,6 +9,9 @@ before:
 builds:
   - env:
       - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    mod_timestamp: "{{ .CommitTimestamp }}"
     ldflags:
       - -s -w -X github.com/Sousuke-Naritomi/dev-box/cmd.Version={{.Version}}
     goos:
@@ -18,7 +23,8 @@ builds:
       - arm64
 
 archives:
-  - format: tar.gz
+  - formats:
+      - tar.gz
     name_template: >-
       {{ .ProjectName }}_
       {{- title .Os }}_
@@ -27,13 +33,20 @@ archives:
       {{- else }}{{ .Arch }}{{ end }}
     format_overrides:
       - goos: windows
-        format: zip
+        formats:
+          - zip
 
 checksum:
   name_template: 'checksums.txt'
 
+sboms:
+  - artifacts: archive
+
 snapshot:
-  name_template: "{{ incpatch .Version }}-next"
+  version_template: "{{ incpatch .Version }}-next"
+
+release:
+  prerelease: auto
 
 changelog:
   sort: asc
