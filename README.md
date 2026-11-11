@@ -177,7 +177,7 @@ DevBox Studio は、`dev-box` をブラウザから操作するための補助�
 
 ![DevBox Studio のメイン画面](docs/images/devbox-studio-main.png)
 
-構成を変更すると、生成予定のファイル数や内容も変わります。たとえば Vue、Node.js、MySQL などの組み合わせを選び、生成結果を画面上で確認できます。
+構成を変更すると、生成予定のファイル数や内容も変わります。たとえばデータベースだけの最小構成なら、5 ファイルの `docker-compose.yml` と設定ファイルだけが生成されます。
 
 ![構成を変更して生成した画面](docs/images/devbox-studio-minimal-stack.png)
 
