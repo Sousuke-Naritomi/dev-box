@@ -589,6 +589,28 @@ CI の Go は、`go.mod` のマイナーバージョンの最新パッチを使�
 3. スタックを実際に起動して確認します。`docker compose up` での起動と応答、生成された `Dockerfile` のビルドと起動、監視を含める場合は Prometheus のターゲットと Grafana のデータソースまで確認します。
 4. 生成プロジェクトを Trivy でスキャンし、固定している依存関係に脆弱性がないことを確認します。
 
+### リリース
+
+`v` で始まるタグを push すると、GitHub Actions がバイナリを作成してリリースを公開します。
+
+```bash
+git tag v0.1.0
+```
+
+```bash
+git push origin v0.1.0
+```
+
+- Linux、macOS、Windows の amd64 と arm64 向けアーカイブ、チェックサム（`checksums.txt`）、各アーカイブの SBOM（SPDX）が付きます。
+- ビルドの来歴（どのワークフローがどのコミットから作ったか）を証明します。ダウンロードしたファイルは、次のコマンドで検証できます。
+
+  ```bash
+  gh attestation verify dev-box_Linux_x86_64.tar.gz --repo Sousuke-Naritomi/dev-box
+  ```
+
+- `.goreleaser.yaml` やこのワークフローを変更するプルリクエストでは、公開せずに全ターゲットをビルドして確認します（`Snapshot build`）。タグを打つ前に、仕組みを試せます。
+- `go install` で入れたバイナリは、タグがあればそのタグを、なければコミット由来のバージョンを `dev-box version` に表示します。
+
 ## ライセンス
 
 [MIT License](LICENSE)
